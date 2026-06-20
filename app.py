@@ -24,7 +24,7 @@ LANG_DICT = {
         "gate_sub": "Đăng nhập để sử dụng công cụ đối soát chứng từ",
         "pwd_label": "Nhập mã an ninh:",
         "pwd_err": "❌ Mã truy cập không hợp lệ!",
-        "main_title": "🏢 HỆ THỐNG ĐỐI SOÁT CHỨNG TỪ E23 - E54",
+        "main_title": "🏢 HỆ THỐNG ĐỐI SOÁT CHỨNG TỪ E54 - E23",
         "main_sub": "Tối ưu hóa tác vụ: Tách mã R ➔ Đối soát ma trận số lượng ➔ Sinh chuỗi Hải quan tự động.",
         "config_side": "### ⚖️ THAM SỐ DUNG SAI",
         "tol_w": "Hàng Vải/Cân ký (KGM, MTK):",
