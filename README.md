@@ -30,4 +30,13 @@
 Nếu bạn muốn chạy thử hệ thống này trên máy tính cá nhân (Local) để test code trước khi đưa lên Cloud, vui lòng làm theo các bước sau:
 
 ### Bước 1: Khởi tạo môi trường
-Yêu cầu hệ
+Yêu cầu hệ thống phải có cài đặt Python >= 3.9
+```bash
+# Tạo môi trường ảo
+python -m venv venv
+
+# Kích hoạt môi trường (trên Windows)
+venv\Scripts\activate
+
+# Cài đặt thư viện
+pip install -r requirements.txt
