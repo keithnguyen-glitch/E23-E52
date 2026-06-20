@@ -1,42 +1,35 @@
-# 🛡️ Hệ Thống Kiểm Định Chứng Từ Xuất Nhập Khẩu E54/E23
+# 🏢 HỆ THỐNG KIỂM ĐỊNH CHỨNG TỪ XNK TỔNG HỢP (E54 / E23)
 
-Ứng dụng nội bộ dành cho phòng Logistics, tự động hóa toàn diện quy trình đối chiếu chéo (Cross-check) giữa chứng từ Hải quan (Invoice, Packing List, Chỉ định giao hàng) và Hệ thống quản lý kho (SAP/ERP).
-
-## 🌟 Tính Năng Cốt Lõi
-- **Đa định dạng đầu vào:** Đọc mượt mà dữ liệu từ Excel, CSV, PDF (bảng biểu) và thậm chí là **Ảnh chụp/Scan (AI OCR)**.
-- **Tối ưu hóa phần cứng:** Tự động nén ảnh đầu vào và sử dụng AI bản CPU siêu nhẹ để ngăn chặn lỗi tràn RAM trên máy chủ Cloud.
-- **Bảo mật tuyệt đối:** Tích hợp cổng kiểm tra mật khẩu nội bộ trước khi cấp quyền sử dụng. (Streamlit Secrets).
-- **Double Check & Xử lý rác:** Tự động loại bỏ các dòng Header thừa của biểu mẫu, có tính năng *Preview* để nhân viên kiểm tra lại file trước khi merge.
-- **Đánh giá logic thông minh (HITL):** Highlight các dòng số liệu bị vênh màu sắc trực quan (Xanh: Khớp, Đỏ: Lệch file gốc, Cam: Lệch ERP).
-- **Xuất báo cáo tự động:** Trả về file Excel dữ liệu sạch để nạp trực tiếp vào ECUS5/VNACCS và biên bản PDF.
+**Phiên bản:** 2.0 (Enterprise Dashboard)
+**Nghiệp vụ:** Logistics / Xuất Nhập Khẩu (Khai báo Hải quan, Quyết toán Gia công)
+**Đơn vị áp dụng:** Ching Luh & Fu-Luh
 
 ---
 
-## 💻 Hướng Dẫn Chạy Tool Nội Bộ (Cho Nhân Viên)
+## 🌟 TỔNG QUAN HỆ THỐNG
+Đây là hệ thống phần mềm tự động hóa (Framework) được thiết kế chuyên biệt để đối chiếu chéo (Cross-check) dữ liệu Xuất Nhập Khẩu. Thay vì dùng hàm VLOOKUP thủ công trên Excel, hệ thống sử dụng Python và AI để đọc, làm sạch, quy đổi và đối chiếu hàng ngàn dòng vật tư chỉ trong vài giây.
 
-Ứng dụng này đã được cấu hình chạy trên nền tảng Web. Bạn không cần cài đặt bất cứ phần mềm nào.
-
-1. Xin cấp mật khẩu truy cập từ Quản trị viên (Phòng XNK).
-2. Truy cập vào đường link hệ thống.
-3. Nhập mật khẩu.
-4. Kéo thả 4 tệp dữ liệu vào các ô tương ứng.
-5. Nhập số dòng tiêu đề thừa (Header) cần bỏ qua.
-6. Bấm **BẮT ĐẦU ĐỐI CHIẾU** và xem kết quả.
+### ✨ CÁC TÍNH NĂNG ĐỘT PHÁ:
+1. **Đối chiếu liên thông 5 chiều:** Tự động so khớp dữ liệu giữa `Invoice` ↔ `Packing List` ↔ `Chỉ Định Giao Hàng` ↔ `SAP/ERP` ↔ `Tờ khai ECUS`.
+2. **Quy đổi Master Data (HSQĐ):** Hệ thống ngầm tự động dò tìm Hệ số quy đổi (Ví dụ: YD sang MTK) và đồng bộ Đơn vị tính (UOM) về chuẩn VNACCS của Hải quan.
+3. **Đọc đa định dạng bằng AI (OCR):** Hỗ trợ đọc dữ liệu bảng biểu từ `Excel`, `CSV`, `PDF` và bóc tách chữ từ `Hình ảnh chụp/Scan` (JPG, PNG).
+4. **Bộ Lọc Lỗi Thông Minh (Tolorence):** - Tự động bỏ qua các sai số làm tròn (Dung sai) đối với hàng cân ký (KGM) hoặc mét vuông (MTK).
+   - Kiểm tra logic toán học: `Số lượng` x `Đơn giá` = `Thành tiền`.
+   - Nút gạt (Toggle) giúp ẩn nhanh các mã đã khớp, chỉ hiển thị dòng bị lỗi.
+5. **Trích xuất 1-Click:** Xuất File Excel dữ liệu đã chuẩn hóa (để nạp thẳng vào phần mềm ECUS) và Biên bản báo cáo file PDF.
 
 ---
 
-## 🛠️ Hướng Dẫn Cài Đặt (Dành Cho IT / Admin)
+## 📁 CẤU TRÚC THƯ MỤC DỰ ÁN
 
-Nếu bạn muốn chạy thử hệ thống này trên máy tính cá nhân (Local) để test code trước khi đưa lên Cloud, vui lòng làm theo các bước sau:
+Để hệ thống hoạt động, thư mục của bạn cần có cấu trúc như sau:
 
-### Bước 1: Khởi tạo môi trường
-Yêu cầu hệ thống phải có cài đặt Python >= 3.9
-```bash
-# Tạo môi trường ảo
-python -m venv venv
-
-# Kích hoạt môi trường (trên Windows)
-venv\Scripts\activate
-
-# Cài đặt thư viện
-pip install -r requirements.txt
+```text
+📁 E54_CHECKER_FRAMEWORK/
+ ├── 📄 app.py               # Mã nguồn chính của giao diện Dashboard
+ ├── 📄 requirements.txt     # Danh sách thư viện Python
+ ├── 📄 packages.txt         # Cấu hình gói thư viện Linux (Chỉ dùng khi up lên Cloud)
+ ├── 📄 START_APP.bat        # File khởi động 1-click dành cho Staff (Chạy Local)
+ ├── 📄 README.md            # Tài liệu hướng dẫn sử dụng này
+ └── 📁 .streamlit/
+      └── 📄 secrets.toml    # File chứa mật khẩu bảo mật (Không up lên mạng)
