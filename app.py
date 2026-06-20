@@ -21,7 +21,7 @@ warnings.filterwarnings('ignore')
 # ==========================================
 # 1. CẤU HÌNH GIAO DIỆN & BẢO MẬT (WHITE-LABEL)
 # ==========================================
-st.set_page_config(layout="wide", page_title="Hệ Sinh Thái XNK E54-E23", page_icon="🌐", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="CLG SCM EXIM VN E54-E23", page_icon="🌐", initial_sidebar_state="expanded")
 
 hide_st_style = """
             <style>
