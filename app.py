@@ -10,6 +10,7 @@ from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import difflib
+from datetime import datetime
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -22,10 +23,10 @@ LANG_DICT = {
         "gate_title": "🌐 CLG SCM EXIM VN INTERNALS",
         "gate_sub": "Hệ thống đối soát liên thông chứng từ phục vụ nhóm nghiệp vụ nhập kho",
         "pwd_label": "Nhập mã an ninh nội bộ:",
-        "pwd_err": "❌ Mã truy cập không hợp lệ!",
+        "pwd_err": "❌ Mã truy cập không hợp lệ hoặc chưa cấu hình Secrets!",
         "main_title": "🏢 PHÂN HỆ KIỂM SOÁT CHỨNG TỪ GIAO NHẬN E23 - E54",
         "main_sub": "Bộ công cụ hỗ trợ tác chiến tuần tự dành cho nhóm nghiệp vụ nhập thuộc CLG SCM EXIM VN (Hỗ trợ đọc Excel, PDF)",
-        "config_side": "### ⚖️ THIẾT LẬP THAM SỐ",
+        "config_side": "### ⚖️ THA M SỐ HỆ THỐNG",
         "tol_w": "Dung sai hàng Vải/Cân ký (KGM, MTK):",
         "tol_c": "Dung sai hàng Đếm chiếc (PCE, PRS, PR):",
         "skip_inv": "Dòng thừa Invoice/PKL thô:",
@@ -64,7 +65,7 @@ LANG_DICT = {
         "gate_title": "🌐 CLG SCM EXIM VN INTERNALS",
         "gate_sub": "Internal interlinked document reconciliation tool for inbound operations",
         "pwd_label": "Enter Internal Security Code:",
-        "pwd_err": "❌ Invalid Access Code!",
+        "pwd_err": "❌ Invalid Access Code or Secrets misconfigured!",
         "main_title": "🏢 E23 - E54 DOCUMENT RECONCILIATION MODULE",
         "main_sub": "Sequential data pipeline customized for CLG SCM EXIM VN inbound team (Excel/PDF supported)",
         "config_side": "### ⚙️ PARAMETERS SETTING",
@@ -100,13 +101,13 @@ LANG_DICT = {
         "tax_msg": "💸 Estimated Inbound Customs Duty: Approx ${:,.2f} USD based on provided tariff.",
         "btn_xlsx": "📊 DOWNLOAD AUDIT EXCEL REPORT (With conditional sheets)",
         "btn_docx": "📝 DOWNLOAD WORD MEMORANDUM FOR DIRECTOR APPROVAL",
-        "toast_e21": "✅ INITIAL E21 IMPORT BALANCE SHIELD SECURED!"
+        "toast_e21": "Perfect ✅ INITIAL E21 IMPORT BALANCE SHIELD SECURED!"
     },
     "🇨🇳 中文": {
         "gate_title": "🌐 CLG SCM EXIM VN 内部系统",
         "gate_sub": "面向进口业务组的进出口单证内部核对工具",
         "pwd_label": "请输入内部安全密码:",
-        "pwd_err": "❌ 访问密码错误!",
+        "pwd_err": "❌ 访问密码错误或未配置密匙!",
         "main_title": "🏢 E23 - E54 单证合规一体化核对模块",
         "main_sub": "专为 CLG SCM EXIM VN 进口团队定制的流水线式数据核对工具（支持Excel/PDF）",
         "config_side": "### ⚙️ 系统参数配置",
@@ -126,7 +127,7 @@ LANG_DICT = {
         "phase0_succ": "📋 自动从原始单据中检测到 {} 个唯一的物料 R 码。",
         "phase0_copy": "👇 点击下方文本框，按 Ctrl+A 再 Ctrl+C 复制列表，直接粘贴至 SAP ZMM12 多项选择框：",
         "phase1_title": "#### 📦 PHASE 1: 实际到货核对与仓储账目交叉审计",
-        "phase1_sub": "系统自动执行多维数量相减，以精确锁定货物损耗与短 heavy 数量。",
+        "phase1_sub": "系统自动执行多维数量相减，以精确锁定货物损耗与短重数量。",
         "grp_comm": "📄 原始商业单证",
         "grp_sap": "💻 内部仓储记录 (SAP)",
         "f_inv_lbl": "1. 官方申报正本发票:",
@@ -147,7 +148,7 @@ LANG_DICT = {
 }
 
 # ==========================================
-# 2. CẤU HÌNH LIGHT MODE CỐ ĐỊNH PHÂN GIẢI CAO
+# 2. CẤU HÌNH LIGHT MODE PHÂN GIẢI CAO (CỐ ĐỊNH)
 # ==========================================
 bg_color, text_color, card_bg, border_color = "#ffffff", "#0f172a", "#f8fafc", "#e2e8f0"
 sidebar_bg, sidebar_text = "#f1f5f9", "#0f172a"
@@ -161,7 +162,6 @@ hide_st_style = f"""
             .block-container {{padding-top: 1rem; padding-bottom: 2rem; background-color: {bg_color}; color: {text_color};}}
             .stApp {{background-color: {bg_color}; color: {text_color};}}
             
-            /* THIẾT LẬP TƯƠNG PHẢN ĐỘ KHỐI SIDEBAR */
             [data-testid="stSidebar"] {{background-color: {sidebar_bg} !important;}}
             [data-testid="stSidebar"] p, 
             [data-testid="stSidebar"] span, 
@@ -177,28 +177,37 @@ hide_st_style = f"""
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-# Lập ngôn ngữ hiển thị từ Sidebar điều hướng
+# Lập cấu hình ngôn ngữ hiển thị động
 with st.sidebar:
     sel_lang = st.selectbox("🌐 LANGUAGE / NGÔN NGỮ:", list(LANG_DICT.keys()))
     t = LANG_DICT[sel_lang]
 
+# LỚP BẢO MẬT TUYỆT ĐỐI: KHÔNG HARDCODE TRÁNH LỘ PASS TRÊN GITHUB
 def check_password():
     if "auth" not in st.session_state: st.session_state["auth"] = False
-    if not st.session_state["auth"]:
-        col1, col2, col3 = st.columns([1,2,1])
-        with col2:
-            st.markdown(f"<h3 style='text-align: center; color: #1E3A8A; padding-top: 50px;'>{t['gate_title']}</h3>", unsafe_allow_html=True)
-            st.markdown(f"<p style='text-align: center; font-size:0.9em; color:#555;'>{t['gate_sub']}</p>", unsafe_allow_html=True)
-            pwd = st.text_input(t['pwd_label'], type="password")
-            if pwd:
-                if pwd == st.secrets.get("app_password", "ChingLuh@2026"):
-                    st.session_state["auth"] = True
-                    st.rerun()
-                else: st.error(t['pwd_err'])
-        return False
-    return True
+    if st.session_state["auth"]:
+        return True
+        
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        st.markdown(f"<h3 style='text-align: center; color: #1E3A8A; padding-top: 50px;'>{t['gate_title']}</h3>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; font-size:0.9em; color:#555;'>{t['gate_sub']}</p>", unsafe_allow_html=True)
+        pwd = st.text_input(t['pwd_label'], type="password")
+        if pwd:
+            # Máy chỉ so khớp với biến môi trường ẩn trong mục Secrets của Streamlit
+            secure_password = st.secrets.get("app_password")
+            if secure_password and pwd == secure_password:
+                st.session_state["auth"] = True
+                if "audit_trail" not in st.session_state: st.session_state.audit_trail = []
+                st.session_state.audit_trail.append(f"🔓 {datetime.now().strftime('%H:%M:%S')} - User authorized via secure token.")
+                st.rerun()
+            else: st.error(t['pwd_err'])
+    return False
 
 if not check_password(): st.stop()
+
+# Khởi tạo bộ lưu trữ log hành động bảo mật
+if "audit_trail" not in st.session_state: st.session_state.audit_trail = []
 
 @st.cache_resource
 def load_ocr_reader(): return easyocr.Reader(['vi', 'en'], gpu=False)
@@ -207,10 +216,10 @@ reader = load_ocr_reader()
 if 'master_hsqd' not in st.session_state: st.session_state.master_hsqd = pd.DataFrame()
 if 'master_thue' not in st.session_state: st.session_state.master_thue = pd.DataFrame()
 if 'baseline_e21_pool' not in st.session_state: st.session_state.baseline_e21_pool = pd.DataFrame()
-if 'data_phase1' not in st.session_state: st.session_state.data_phase1 = pd.DataFrame()
+if 'data_p1' not in st.session_state: st.session_state.data_p1 = pd.DataFrame()
 
 # ==========================================
-# 3. ĐỘNG CƠ KHỬ NHIỄU & PHÒNG VỆ FORMAT FILE Excel
+# 3. ĐỘNG CƠ KHỬ NHIỄU & PHÒNG VỆ FORMAT FILE
 # ==========================================
 class DataSanitizer:
     @staticmethod
@@ -223,7 +232,7 @@ class DataSanitizer:
     @staticmethod
     def purify_material_code(val):
         if pd.isna(val): return ""
-        s = str(val).strip().split('.')[0] # CHẶN LỖI ĐUÔI .0 THẬP PHÂN CỦA Excel
+        s = str(val).strip().split('.')[0] # PHÁ BỎ ĐUÔI .0 THẬP PHÂN LỖI CỦA EXCEL
         return re.sub(r'[^A-Z0-9]', '', s.upper())
 
 class SmartFileReader:
@@ -299,8 +308,69 @@ def parse_ecus(raw_df, master_codes, prefix):
     res.rename(columns={h_col: 'HS_Code'}, inplace=True)
     return res.groupby(['Ma_Vat_Tu', 'HS_Code'], as_index=False)[f'SL_{prefix}'].sum()
 
+class ExportEngine:
+    @staticmethod
+    def to_excel(df):
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Consolidated_Audit_Result')
+            wb = writer.book
+            ws = writer.sheets['Consolidated_Audit_Result']
+            fmt_header = wb.add_format({'bold': True, 'bg_color': '#1E3A8A', 'font_color': 'white', 'border': 1, 'align': 'center'})
+            fmt_red = wb.add_format({'bg_color': '#FEE2E2', 'font_color': '#991B1B', 'border': 1})
+            fmt_green = wb.add_format({'bg_color': '#D1FAE5', 'font_color': '#065F46', 'border': 1})
+            fmt_num = wb.add_format({'num_format': '#,##0.00', 'border': 1})
+            
+            for col_idx, col_name in enumerate(df.columns):
+                ws.write(0, col_idx, col_name, fmt_header)
+                max_len = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 3
+                ws.set_column(col_idx, col_idx, max_len)
+                if df[col_name].dtype in [np.float64, np.int64]: ws.set_column(col_idx, col_idx, max_len, fmt_num)
+            
+            status_col_idx = len(df.columns) - 1
+            ws.set_column(status_col_idx, status_col_idx, 45)
+            for row_idx, status in enumerate(df.iloc[:, status_col_idx]):
+                fmt = fmt_green if "🟢" in str(status) or "🟡" in str(status) else fmt_red
+                ws.write(row_idx + 1, status_col_idx, str(status), fmt)
+        return output.getvalue()
+
+    @staticmethod
+    def to_word(df, phrase_dict):
+        doc = Document()
+        doc.add_heading('BIÊN BẢN ĐỐI CHIẾU SỐ LIỆU CHUỖI CUNG ỨNG', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_paragraph(f"Date/Time: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        status_col_idx = len(df.columns) - 1
+        err_df = df[~df.iloc[:, status_col_idx].str.contains("🟢|🟡", regex=True)]
+        if err_df.empty:
+            doc.add_paragraph("All matched successfully.")
+        else:
+            table = doc.add_table(rows=1, cols=3)
+            table.style = 'Table Grid'
+            hdr = table.rows[0].cells
+            hdr[0].text, hdr[1].text, hdr[2].text = 'Material', 'Invoice Qty', 'Status'
+            for _, r in err_df.head(25).iterrows():
+                row = table.add_row().cells
+                row[0].text, row[1].text, row[2].text = str(r.iloc[0]), str(r.iloc[2]), str(r.iloc[-1])
+        output = io.BytesIO()
+        doc.save(output)
+        return output.getvalue()
+
 # ==========================================
-# 6. THÂN DIỄN TIẾN TUẦN TỰ WORKFLOW
+# 4. SIDEBAR CONFIGURATION
+# ==========================================
+with st.sidebar:
+    st.markdown(t["config_side"])
+    tol_weight = st.slider(t["tol_w"], min_value=0.0, max_value=1.0, value=0.2, step=0.05)
+    tol_count = st.slider(t["tol_c"], min_value=0.0, max_value=0.1, value=0.01, step=0.01)
+    
+    # Nút bấm Đăng xuất an toàn bảo vệ dữ liệu khi rời máy
+    st.markdown("---")
+    if st.button("🚪 Đăng xuất an toàn (Secure Logout)", use_container_width=True):
+        st.session_state["auth"] = False
+        st.rerun()
+
+# ==========================================
+# 5. THÂN CHƯƠNG TRÌNH WORKFLOW TUẦN TỰ
 # ==========================================
 st.markdown(f"<h3 style='color: #1E3A8A; margin-top:0px;'>{t['main_title']}</h3>", unsafe_allow_html=True)
 st.markdown(f"<p style='font-size: 0.9em; color: #555;'>{t['main_sub']}</p>", unsafe_allow_html=True)
@@ -347,6 +417,7 @@ if f_ref_e21:
         df_e21_clean['SL_E21_GOC'] = DataSanitizer.clean_numeric(df_e21_clean['SL_E21_GOC'])
         st.session_state.baseline_e21_pool = df_e21_clean.groupby('Ma_Vat_Tu', as_index=False)['SL_E21_GOC'].sum()
         st.toast(t["toast_e21"])
+        st.session_state.audit_trail.append(f"🔒 {datetime.now().strftime('%H:%M:%S')} - E21 Import database pool locked.")
 
 if f_pre_inv or f_pre_pkl:
     df_temp_i = SmartFileReader.read_smart(f_pre_inv, ['Material code', 'Material', 'Mã'])
@@ -389,7 +460,7 @@ if f_inv_real and f_sap_zmm:
     df_inv = df_inv.groupby(['Ma_Vat_Tu', 'UOM_INV', 'DonGia'], as_index=False)[['SL_INV', 'TriGia']].sum()
     
     masters = df_inv['Ma_Vat_Tu'].tolist()
-    master_purified_dict = {purify_code(m): m for m in masters}
+    master_purified_dict = {DataSanitizer.purify_material_code(m): m for m in masters}
     df_inv['Math_TriGia_Check'] = np.where(abs((df_inv['SL_INV'] * df_inv['DonGia']) - df_inv['TriGia']) > 0.05, "🚨 BAD AMOUNT", "🟢 OK")
 
     p_mat = get_col(r_pkl, ['Material', 'Mã'], 0)
@@ -489,6 +560,11 @@ if f_ecus_hang and not st.session_state.data_p1.empty:
 
     tong_thue = mg_final['Thue_Du_Kien'].sum() if 'Thue_Du_Kien' in mg_final.columns else 0
     if tong_thue > 0: st.info(t["tax_msg"].format(tong_thue))
+
+    # HIỂN THỊ LOG HOẠT ĐỘNG AN NINH ĐỂ KIỂM TOÁN QUY TRÌNH (Audit Compliance)
+    if st.session_state.audit_trail:
+        with st.expander("🛡️ Nhật ký hoạt động bảo mật hệ thống (Security Audit Trail)"):
+            for log in st.session_state.audit_trail: st.caption(log)
 
     st.markdown(f"#### {t['grp_ecus']}")
     d1, d2 = st.columns(2)
