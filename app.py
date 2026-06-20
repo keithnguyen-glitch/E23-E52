@@ -241,7 +241,8 @@ class DataEngine:
                 df_raw.columns = [str(c).strip() for c in df_raw.columns]
                 header_row_idx = None
                 for i, row in df_raw.head(30).iterrows():
-                    combined_str = " ".join(row.dropna().astype(str).lower())
+                    # VÁ LỖI 1: Bóc từng chữ ra biến thành str rồi mới lower, không gọi lower() trực tiếp lên Series
+                    combined_str = " ".join([str(val).lower() for val in row.dropna()])
                     if any(kw.lower() in combined_str for kw in target_keywords):
                         header_row_idx = i; break
                 if header_row_idx is not None:
@@ -274,7 +275,7 @@ class DataEngine:
                 ocr_results = reader.readtext(np.array(img), detail=0)
                 return pd.DataFrame(ocr_results, columns=["Du_Lieu_OCR"])
 
-        except Exception as e: st.error(f"Error parsing: {e}")
+        except Exception as e: st.error(f"Error parsing file: {e}")
         return pd.DataFrame()
 
     @staticmethod
@@ -424,7 +425,8 @@ if f_inv_real and f_sap_zmm:
     p_mat = DataEngine.get_col(r_pkl, ['Material', 'Mã'], 0)
     p_qty = DataEngine.get_col(r_pkl, ["Q'TY", 'Quantity'], 5)
     df_pkl = pd.DataFrame()
-    df_pkl['Ma_Vat_Tu'] = r_pkl[p_mat].astype(str).str.strip().upper().apply(lambda x: DataEngine.fz_match(x, masters, master_purified_dict))
+    # VÁ LỖI 2: Thêm .str.upper() thay vì .upper() để chạy mượt cho cột dữ liệu Series
+    df_pkl['Ma_Vat_Tu'] = r_pkl[p_mat].astype(str).str.strip().str.upper().apply(lambda x: DataEngine.fz_match(x, masters, master_purified_dict))
     df_pkl['SL_PKL'] = DataEngine.clean_numeric(r_pkl[p_qty])
     df_pkl = df_pkl.groupby('Ma_Vat_Tu', as_index=False)['SL_PKL'].sum()
 
@@ -433,7 +435,8 @@ if f_inv_real and f_sap_zmm:
         cd_mat = DataEngine.get_col(r_cd, ['Mã NL', 'Material'], 1)
         cd_qty = DataEngine.get_col(r_cd, ['Số Lượng', 'Quantity'], 4)
         df_cd = pd.DataFrame()
-        df_cd['Ma_Vat_Tu'] = r_cd[cd_mat].astype(str).str.strip().upper().apply(lambda x: DataEngine.fz_match(x, masters, master_purified_dict))
+        # VÁ LỖI 2: Thêm .str.upper() thay vì .upper()
+        df_cd['Ma_Vat_Tu'] = r_cd[cd_mat].astype(str).str.strip().str.upper().apply(lambda x: DataEngine.fz_match(x, masters, master_purified_dict))
         df_cd['SL_ChiDinh'] = DataEngine.clean_numeric(r_cd[cd_qty])
         df_cd = df_cd.groupby('Ma_Vat_Tu', as_index=False)['SL_ChiDinh'].sum()
 
