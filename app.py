@@ -20,7 +20,7 @@ warnings.filterwarnings('ignore')
 # ==========================================
 LANG_DICT = {
     "🇻🇳 Tiếng Việt": {
-        "gate_title": "🌐 CỔNG ĐIỀU HÀNH XNK NỘI BỘ",
+        "gate_title": "🌐 CLG SCM EXIM _ IMPORT TEAM E54 & E23",
         "gate_sub": "Đăng nhập để sử dụng công cụ đối soát chứng từ",
         "pwd_label": "Nhập mã an ninh:",
         "pwd_err": "❌ Mã truy cập không hợp lệ!",
