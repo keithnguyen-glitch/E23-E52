@@ -187,7 +187,7 @@ with st.sidebar:
     skip_erp = st.number_input("Dòng thừa SAP (ZMM12):", value=0)
     skip_ecus = st.number_input("Dòng thừa Tờ Khai (Tab HANG):", value=7)
 
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>💎 TRUNG TÂM KIỂM ĐỊNH LIÊN THÔNG CHỨNG TỪ XNK</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>💎 TOOL KIỂM TRA CHÉO CHỨNG TỪ XNK E54/E23</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; font-size: 1.05em;'>Hỗ trợ tự động hóa khép kín: Tách mã liệu R ➔ Quét sổ kho SAP ZMM12 ➔ Ráp chuỗi Hải quan #& ➔ Xuất form tờ khai đầu 30.</p>", unsafe_allow_html=True)
 st.markdown("---")
 
