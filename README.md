@@ -1,69 +1,58 @@
-# 🏢 HỆ THỐNG KIỂM ĐỊNH CHỨNG TỪ XNK TỔNG HỢP (E54 / E23)
+🏢 CLG SCM EXIM VN - E23 & E54 Reconciliation Tool
+Hệ thống kiểm soát và đối chiếu liên thông chứng từ xuất nhập khẩu (Loại hình E23 - Nhập gia công / E54 - Xuất gia công). Ứng dụng giúp loại bỏ hoàn toàn các thao tác VLOOKUP thủ công, tự động phát hiện sai lệch số lượng và tự động sinh chuỗi dữ liệu khai báo Hải quan.
 
-**Phiên bản:** 3.0 (Enterprise Architecture & Logic Engine)
-**Nghiệp vụ áp dụng:** Logistics / Xuất Nhập Khẩu (Khai báo Hải quan, Quyết toán Gia công)
-**Đơn vị áp dụng:** Ching Luh & Fu-Luh
+🌟 Tính năng Cốt lõi (Key Features)
+Smart File Extractor: Tự động quét và tìm dòng tiêu đề (Header) của các file Excel/CSV/PDF, nhân viên không cần thiết lập skiprows thủ công. Hỗ trợ đọc cả file PDF và Ảnh (bằng AI OCR).
 
+Data Sanitization: Tự động khử nhiễu dữ liệu. Loại bỏ chữ/ký tự lạ dính trong cột số lượng; Xóa bỏ các đuôi thập phân lỗi (.0) và khoảng trắng trong Mã vật tư để khớp lệnh chính xác tuyệt đối.
 
+Multi-dimensional Cross-Check: Đối chiếu ma trận 5 chiều (Invoice ↔ Packing List ↔ Chỉ Định ↔ SAP ZMM12 ↔ ECUS Hải Quan).
 
-[Image of data integration architecture diagram]
+Customs String Auto-Generator: Tự động lắp ghép chuỗi mô tả truyền tờ khai Hải Quan (Đầu 30+) theo đúng cú pháp [Mã NL]#&[Mô tả].
 
+Dynamic Tolerance: Thanh trượt tùy chỉnh dung sai cho phép lệch (ví dụ: ±0.2 KG cho hàng cân ký, 0 cho hàng đếm chiếc).
 
----
+Multi-language & Export: Hỗ trợ 3 ngôn ngữ (VI, EN, ZH). Xuất báo cáo Excel (tự động căn cột, tô màu lỗi) và biên bản Word trình ký.
 
-## 🌟 TỔNG QUAN HỆ THỐNG (SYSTEM OVERVIEW)
-Đây là hệ thống phần mềm tự động hóa (Framework) được thiết kế chuyên biệt để đối chiếu chéo (Cross-check) dữ liệu Xuất Nhập Khẩu. Hệ thống giải quyết triệt để bài toán sai lệch số liệu giữa Chứng từ nội bộ, Sổ sách Kế toán kho (SAP/ERP) và Dữ liệu khai báo Hải quan (ECUS/VNACCS).
+🔄 Luồng Vận hành (Workflow)
+Hệ thống được thiết kế theo luồng tác chiến tuần tự của nhân viên kho:
 
-Thay vì sử dụng hàm VLOOKUP thủ công và dễ sai sót trên Excel, hệ thống sử dụng Python (Pandas) kết hợp AI (OCR) để thiết lập một luồng xử lý tự động từ khâu bóc tách, chuẩn hóa, quy đổi đến đánh giá dung sai.
+Phase 0 (SAP Query Helper): * Tải chứng từ thô (Invoice/PKL) lên.
 
----
+Hệ thống bóc tách, lọc trùng và nhả ra danh sách Mã vật tư (R-codes) sạch.
 
-## 🧠 GIẢI THÍCH LUỒNG LOGIC THUẬT TOÁN (CORE LOGIC ENGINE)
+Mục đích: Nhân viên copy list này dán vào SAP để kết xuất báo cáo ZMM12 nhanh chóng.
 
-Toàn bộ sức mạnh của dự án nằm ở **Quy trình xử lý 6 Pha (6-Phase Pipeline)**. Dưới đây là giải thích chi tiết cách máy tính tư duy và xử lý dữ liệu:
+Phase 1 (Actual Delivery Audit): * Tải bộ chứng từ chính thức (Invoice, PKL, Chỉ định) + Báo cáo SAP ZMM12 vừa tải về.
 
-### Pha 1: Trích xuất & Làm sạch thông minh (Smart Extraction & Cleaning)
-- **Đa định dạng:** Đọc mượt mà dữ liệu từ `Excel`, `CSV`, bảng biểu `PDF`. Tích hợp công nghệ **EasyOCR** để bóc tách text từ ảnh chụp/scan (`JPG/PNG`).
-- **Dynamic Header (Bỏ qua dòng rác):** Các biểu mẫu XNK thường có phần thông tin công ty, địa chỉ ở đầu. Hệ thống cho phép cắt bỏ linh hoạt số dòng rác (`skiprows`) để đưa bảng dữ liệu về chuẩn cấu trúc hàng/cột.
-- **Dọn dẹp:** Tự động loại bỏ các cột không tên (`Unnamed`), các dòng trống (`NaN`) trước khi đưa vào bộ nhớ.
+Hệ thống trừ cấn trừ số lượng, phát hiện chênh lệch đóng gói và hao hụt tồn kho.
 
-### Pha 2: Ánh xạ và Đồng bộ (Mapping & Normalization)
-- **Thuật toán `get_col_fallback`:** Không hardcode (gắn cứng) tên cột. Máy tính sẽ quét bằng từ khóa (Ví dụ: tìm cột `Material` hoặc `Mã NL`), giúp hệ thống vẫn chạy đúng dù đối tác có thay đổi tên cột trên biểu mẫu.
-- **Chuẩn hóa UOM (Đơn vị tính):** Tự động quy đổi các đơn vị viết tắt nội bộ về chuẩn mã VNACCS của Hải quan thông qua một từ điển (Dictionary) định sẵn. *(Ví dụ: `PC`, `PCS` -> `PCE`; `KG`, `KGS` -> `KGM`; `YD` -> `YRD`; `M2` -> `MTK`)*.
-- **Làm sạch chuỗi (String Clean):** Ép toàn bộ mã vật tư về chữ IN HOA và xóa khoảng trắng thừa (`.strip().upper()`), ngăn chặn lỗi vênh mã do lỗi đánh máy.
+Phase 2 (Customs Sync & Export): * Tải file Tờ khai Hải quan (ECUS - Tab HANG).
 
-### Pha 3: Động cơ Quy đổi Master Data (HSQĐ Conversion Engine)
-- Dữ liệu nguyên phụ liệu (đặc biệt là Vải/Mesh) thường được mua theo Yard/Inch nhưng Hải quan yêu cầu khai theo Mét vuông (MTK).
-- Thuật toán hoạt động như một hàm VLOOKUP động: Quét Mã vật tư trên Invoice/PKL, nếu tồn tại trong file `Bảng Master HSQĐ`, hệ thống ngầm thực hiện phép tính: **`Số lượng thực tế` x `Hệ số quy đổi`** và tự động đổi Đơn vị báo quan thành chuẩn (MTK).
+Đối chiếu chốt chặn cuối cùng. Tải báo cáo Excel & Biên bản Word.
 
-### Pha 4: Đối chiếu liên thông 5 chiều (5-Way Cross-Check & Full Outer Join)
-Hệ thống sử dụng Mã vật tư (`Ma_Vat_Tu`) làm Trục xương sống (Key) để thực hiện lệnh nối bảng `Outer Join` trên Pandas.
-- **Bóc tách ECUS:** Tờ khai Hải quan ECUS thường trộn lẫn mã nguyên liệu vào trong chuỗi Mô tả (Ví dụ: *NL32#&Hạt nhựa...*). Hệ thống dùng thuật toán Substring Matching quét đối chiếu với danh sách mã gốc để bóc tách chính xác Mã NL ra một cột riêng để merge.
-- Cuối cùng, hệ thống dùng thuật toán GroupBy để cộng dồn số lượng nếu một mã vật tư bị chia ra làm nhiều dòng đóng gói (trên PKL).
+🛠️ Cài đặt & Triển khai (Installation)
+1. Yêu cầu hệ thống (Requirements)
+Cài đặt các thư viện cần thiết thông qua tệp requirements.txt:
 
-### Pha 5: Bộ Đánh giá Logic Nghiệp vụ (HITL Rule Engine)
-Hệ thống tính toán các độ lệch (Difference) và đưa qua bộ màng lọc Logic (Tolerance Rule):
-1. **Lỗi Khuyết mã:** Có mã trên Invoice nhưng mất tích trên Tờ khai, hoặc ngược lại.
-2. **Lỗi Nhân tiền:** Kiểm tra chéo `Số Lượng x Đơn Giá = Thành Tiền` (Cho phép sai số làm tròn 0.05 USD).
-3. **Chấp nhận Dung sai (Tolerance):** Nhận diện hàng Cân ký (`KGM`) hoặc Mét vuông (`MTK`). Nếu độ lệch giữa thực tế cân đo (PKL/ERP) và chứng từ (Invoice) ≤ `0.2` thì đánh giá là **KHỚP (Vàng)** do làm tròn số thập phân.
-4. **Phân loại Trách nhiệm (Color Coding):** - 🔴 **ĐỎ:** Lệch chứng từ (Lỗi do nhà cung cấp/phòng Mua hàng).
-   - 🟠 **CAM:** Lệch SAP/ERP (Lỗi do bộ phận Kho thực tế).
+Bash
+pip install -r requirements.txt
+2. Cấu hình Bảo mật (Security Secrets)
+Ứng dụng sử dụng cơ chế bảo mật Password Gate. Bắt buộc phải tạo file secrets trước khi chạy để tránh lỗi KeyError.
 
-### Pha 6: Output & Báo cáo (Reporting)
-- Render giao diện DataFrame tích hợp bộ lọc nhanh (chỉ hiện lỗi).
-- Xuất file Excel định dạng chuẩn, có thể nạp thẳng vào phần mềm VNACCS/ECUS.
-- Render Biên bản đối chiếu tự động bằng PDF.
+Chạy Local: Tạo thư mục .streamlit/ ở thư mục gốc của project, tạo file secrets.toml bên trong và thêm dòng sau:
 
----
+Ini, TOML
+app_password = "Mat_khau_cua_ban"
+Chạy trên Streamlit Cloud: Vào Settings của App -> mục Secrets -> Dán cấu hình trên vào.
 
-## 📁 CẤU TRÚC DỰ ÁN (PROJECT STRUCTURE)
+3. Khởi chạy Ứng dụng
 
-```text
-📁 E54_CHECKER_FRAMEWORK/
- ├── 📄 app.py               # Chứa luồng xử lý UI (Streamlit) và 6 Pha thuật toán
- ├── 📄 requirements.txt     # Các gói thư viện Python yêu cầu
- ├── 📄 packages.txt         # Cấu hình gói đồ họa Linux (dành cho OCR trên Cloud)
- ├── 📄 START_APP.bat        # Mã kịch bản (Script) khởi động cục bộ cho nhân viên
- ├── 📄 README.md            # Tài liệu kiến trúc và hướng dẫn sử dụng (File này)
- └── 📁 .streamlit/
-      └── 📄 secrets.toml    # Lưu trữ mật khẩu an toàn (Bỏ qua bởi Git)
+Bash
+streamlit run app.py
+🔒 Bảo mật dữ liệu (Data Privacy)
+In-Memory Processing: Ứng dụng xử lý mọi tệp chứng từ trực tiếp trên RAM (Volatility). Không có bất kỳ tệp dữ liệu gốc hay báo cáo nào của công ty được lưu trữ xuống ổ cứng máy chủ.
+
+Zero-Hardcode: Mật khẩu truy cập được cô lập hoàn toàn khỏi mã nguồn trên GitHub.
+
+Developed for internal workflow optimization at CLG SCM EXIM VN.
