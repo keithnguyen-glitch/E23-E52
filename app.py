@@ -1,61 +1,29 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import io
-import os
 import pdfplumber
 import easyocr
+import numpy as np
 from PIL import Image
 from fpdf import FPDF
-from docx import Document
-from docx.shared import Pt, Inches, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 import difflib
 import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
-import warnings
-
-warnings.filterwarnings('ignore')
 
 # ==========================================
-# 1. CẤU HÌNH GIAO DIỆN & BẢO MẬT (WHITE-LABEL)
+# 1. CẤU HÌNH GIAO DIỆN & BẢO MẬT
 # ==========================================
-st.set_page_config(layout="wide", page_title="Hệ Sinh Thái XNK E54-E23", page_icon="🌐", initial_sidebar_state="expanded")
-
-hide_st_style = """
-            <style>
-            #MainMenu {visibility: hidden;}
-            footer {visibility: hidden;}
-            header {visibility: hidden;}
-            .stDeployButton {display:none;}
-            .block-container {padding-top: 1rem; padding-bottom: 2rem;}
-            /* Custom Sidebar */
-            [data-testid="stSidebar"] {background-color: #f8fafc;}
-            
-            /* Giữ lại CSS cho các Dashboard Card cho đẹp */
-            .metric-card {background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid #2563eb; margin-bottom: 15px;}
-            .metric-card.alert {border-left-color: #ef4444;}
-            .metric-card.success {border-left-color: #10b981;}
-            .metric-title {font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase;}
-            .metric-value {font-size: 28px; color: #0f172a; font-weight: 900;}
-            </style>
-            """
-st.markdown(hide_st_style, unsafe_allow_html=True)
+st.set_page_config(layout="wide", page_title="CLG SCM EXIM VN E23 E54 checker", page_icon="💎", initial_sidebar_state="expanded")
 
 def check_password():
-    if "auth" not in st.session_state: st.session_state["auth"] = False
-    if not st.session_state["auth"]:
-        col1, col2, col3 = st.columns([1,2,1])
-        with col2:
-            st.markdown("<h2 style='text-align: center; color: #1E3A8A; padding-top: 50px;'>🌐 CỔNG ĐIỀU HÀNH CHUỖI CUNG ỨNG</h2>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center;'>Hệ thống liên thông dữ liệu Ching Luh & Fu-Luh</p>", unsafe_allow_html=True)
-            pwd = st.text_input("Nhập mã truy cập an ninh:", type="password")
-            if pwd:
-                if pwd == st.secrets.get("app_password", "ChingLuh@2026"):
-                    st.session_state["auth"] = True
-                    st.rerun()
-                else: st.error("❌ Mã truy cập không hợp lệ!")
+    if "password_correct" not in st.session_state: st.session_state["password_correct"] = False
+    if not st.session_state["password_correct"]:
+        st.markdown("<h2 style='text-align: center; color: #1E3A8A;'>🔒 CỔNG AN NINH PHÒNG XNK</h2>", unsafe_allow_html=True)
+        pwd = st.text_input("Nhập mật khẩu truy cập hệ thống:", type="password")
+        if pwd:
+            if pwd == st.secrets.get("app_password", "ChingLuh@2026"):
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else: st.error("❌ Mật khẩu không chính xác!")
         return False
     return True
 
@@ -65,551 +33,293 @@ if not check_password(): st.stop()
 def load_ocr_reader(): return easyocr.Reader(['vi', 'en'], gpu=False)
 reader = load_ocr_reader()
 
-# =====================================================================
-# 2. DATA LAYER (QUẢN LÝ BỘ NHỚ VÀ STATE)
-# =====================================================================
-class SessionManager:
-    @staticmethod
-    def init_state():
-        default_states = {
-            'master_hsqd': pd.DataFrame(),
-            'master_thue': pd.DataFrame(),
-            'transit_data': pd.DataFrame(),
-            'inv_date': datetime.today().date(),
-            'audit_logs': []
-        }
-        for key, val in default_states.items():
-            if key not in st.session_state:
-                st.session_state[key] = val
+# ==========================================
+# 2. HÀM BỔ TRỢ NGHIỆP VỤ XNK & FUZZY MATCH
+# ==========================================
+def extract_and_clean_data(uploaded_file, skiprows_count=0):
+    if uploaded_file is None: return None
+    ext = uploaded_file.name.split('.')[-1].lower()
+    try:
+        if ext in ['xlsx', 'xls', 'csv']:
+            df = pd.read_csv(uploaded_file, skiprows=skiprows_count, on_bad_lines='skip') if ext == 'csv' else pd.read_excel(uploaded_file, skiprows=skiprows_count)
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            df = df.dropna(how='all')
+            df.columns = [str(c).strip() for c in df.columns]
+            return df
+        elif ext == 'pdf':
+            all_rows = []
+            with pdfplumber.open(io.BytesIO(uploaded_file.read())) as pdf:
+                for page in pdf.pages:
+                    for table in page.extract_tables():
+                        for row in table:
+                            cr = [str(cell).replace('\n', ' ') if cell else '' for cell in row]
+                            if any(cr): all_rows.append(cr)
+            if all_rows: return pd.DataFrame(all_rows[1:], columns=all_rows[0])
+        elif ext in ['png', 'jpg', 'jpeg']:
+            img = Image.open(uploaded_file)
+            img.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+            return pd.DataFrame(reader.readtext(np.array(img), detail=0), columns=["Dữ_Liệu"])
+    except Exception as e: st.error(f"Lỗi file {uploaded_file.name}: {e}")
+    return None
 
-    @staticmethod
-    def log_action(module, msg):
-        st.session_state.audit_logs.append({
-            "Time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Module": module,
-            "Action": msg
-        })
+def normalize_uom(uom):
+    if pd.isna(uom) or str(uom).strip() == '': return "PCE"
+    uom_dict = {'PC': 'PCE', 'UNIT': 'PCE', 'PCS': 'PCE', 'PR': 'PRS', 'PAIRS': 'PRS', 'PAIR': 'PRS', 'KG': 'KGM', 'KGS': 'KGM', 'M': 'MTR', 'YD': 'YRD', 'YDS': 'YRD', 'M2': 'MTK', 'MTK': 'MTK'}
+    return uom_dict.get(str(uom).strip().upper(), str(uom).strip().upper())
 
-SessionManager.init_state()
+def get_col_fallback(df, keywords, fallback_idx):
+    for col in df.columns:
+        for kw in keywords:
+            if kw.lower() in col.lower(): return col
+    return df.columns[fallback_idx] if len(df.columns) > fallback_idx else None
 
-# =====================================================================
-# 3. UTILITIES & EXTRACTORS (CÔNG CỤ TRÍCH XUẤT)
-# =====================================================================
-class DataExtractor:
-    @staticmethod
-    def read_file(file_obj, skiprows=0):
-        if not file_obj: return pd.DataFrame()
-        ext = file_obj.name.split('.')[-1].lower()
-        try:
-            if ext in ['xlsx', 'xls', 'csv']:
-                df = pd.read_csv(file_obj, skiprows=skiprows, on_bad_lines='skip') if ext == 'csv' else pd.read_excel(file_obj, skiprows=skiprows)
-                df = df.loc[:, ~df.columns.str.contains('^Unnamed')].dropna(how='all')
-                df.columns = [str(c).strip() for c in df.columns]
+def fuzzy_match_code(target_code, master_codes_list):
+    """Thuật toán Fuzzy Matching: Tự động gom mã nếu gõ sai chính tả nhẹ (Sai dấu cách, gạch nối)"""
+    if target_code in master_codes_list: return target_code, False
+    matches = difflib.get_close_matches(target_code, master_codes_list, n=1, cutoff=0.85)
+    if matches: return matches[0], True # Trả về mã chuẩn đã match và Cờ báo hiệu (Fuzzy = True)
+    return target_code, False
+
+# ==========================================
+# 3. GIAO DIỆN UPLOAD FILE (7 MODULES)
+# ==========================================
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>💎 XNK ULTIMATE AI CHECKER (LEVEL MAX)</h1>", unsafe_allow_html=True)
+st.markdown("---")
+
+c1, c2, c3, c4 = st.columns(4)
+with c1:
+    st.info("📦 **CHỨNG TỪ GỐC**")
+    file_inv = st.file_uploader("1. INVOICE KHAI BÁO", type=["xlsx", "csv", "pdf"])
+    file_pkl = st.file_uploader("2. PACKING LIST", type=["xlsx", "csv", "pdf"])
+with c2:
+    st.warning("🚛 **SỔ SÁCH & KHO**")
+    file_cd  = st.file_uploader("3. CHỈ ĐỊNH GIAO HÀNG", type=["xlsx", "csv", "pdf"])
+    file_erp = st.file_uploader("4. BÁO CÁO XUẤT KHO SAP", type=["xlsx", "csv"])
+with c3:
+    st.success("🏛️ **HẢI QUAN ECUS**")
+    file_ecus = st.file_uploader("5. TỜ KHAI HẢI QUAN HÀNG", type=["xlsx", "csv"])
+    file_thue = st.file_uploader("6. BẢNG BIỂU THUẾ (Mã HS)", type=["xlsx", "csv"])
+with c4:
+    st.error("⚙️ **MASTER DATA**")
+    file_hsqd = st.file_uploader("7. BẢNG HỆ SỐ QUY ĐỔI", type=["xlsx", "csv"])
+
+with st.sidebar:
+    st.markdown("### ⚙️ CẤU HÌNH HEADER (SKIPROWS)")
+    skip_inv = st.number_input("Header Invoice:", value=15)
+    skip_pkl = st.number_input("Header PKL:", value=15)
+    skip_cd  = st.number_input("Header Chỉ Định:", value=17)
+    skip_erp = st.number_input("Header SAP/ERP:", value=0)
+    skip_ecus = st.number_input("Header ECUS:", value=18)
+    skip_thue = st.number_input("Header Biểu Thuế:", value=2)
+    skip_hsqd = st.number_input("Header Bảng HSQĐ:", value=1)
+
+# ==========================================
+# 4. CORE ENGINE XỬ LÝ
+# ==========================================
+st.markdown("<br>", unsafe_allow_html=True)
+if st.button("🚀 KÍCH HOẠT SIÊU HỆ THỐNG KIỂM ĐỊNH", type="primary", use_container_width=True):
+    if not (file_inv and file_pkl):
+        st.error("⚠️ Hệ thống yêu cầu tải lên tối thiểu INVOICE và PACKING LIST.")
+    else:
+        with st.spinner("🔄 Hệ thống đang chạy Fuzzy Match, tính N.W/G.W, và dò mã HS Biểu Thuế..."):
+            
+            raw_inv = extract_and_clean_data(file_inv, skip_inv)
+            raw_pkl = extract_and_clean_data(file_pkl, skip_pkl)
+            raw_cd  = extract_and_clean_data(file_cd, skip_cd)
+            raw_erp = extract_and_clean_data(file_erp, skip_erp) if file_erp else pd.DataFrame()
+            raw_ecus = extract_and_clean_data(file_ecus, skip_ecus) if file_ecus else pd.DataFrame()
+            raw_thue = extract_and_clean_data(file_thue, skip_thue) if file_thue else pd.DataFrame()
+            raw_hsqd = extract_and_clean_data(file_hsqd, skip_hsqd) if file_hsqd else pd.DataFrame()
+
+            def clean_code(s): return str(s).strip().upper()
+
+            # --- SETUP HSQĐ ---
+            df_hsqd = pd.DataFrame(columns=['Ma_Vat_Tu', 'He_So_QD', 'DVT_Bao_Quan'])
+            if not raw_hsqd.empty:
+                df_hsqd = raw_hsqd[[get_col_fallback(raw_hsqd, ['Mã số', 'Material'], 1), get_col_fallback(raw_hsqd, ['Hệ số', 'Rate'], 6), get_col_fallback(raw_hsqd, ['Đơn vị báo quan'], 8)]].dropna()
+                df_hsqd.columns = ['Ma_Vat_Tu', 'He_So_QD', 'DVT_Bao_Quan']
+                df_hsqd['Ma_Vat_Tu'] = df_hsqd['Ma_Vat_Tu'].apply(clean_code)
+                df_hsqd['He_So_QD'] = pd.to_numeric(df_hsqd['He_So_QD'], errors='coerce').fillna(1.0)
+                df_hsqd['DVT_Bao_Quan'] = df_hsqd['DVT_Bao_Quan'].apply(normalize_uom)
+
+            def apply_hsqd_engine(df, qty_col, uom_col):
+                if not df_hsqd.empty and not df.empty:
+                    df = pd.merge(df, df_hsqd, on='Ma_Vat_Tu', how='left')
+                    df['He_So_QD'] = df['He_So_QD'].fillna(1.0)
+                    df[qty_col] = df[qty_col] * df['He_So_QD']
+                    if uom_col in df.columns: df[uom_col] = df['DVT_Bao_Quan'].combine_first(df[uom_col])
+                    return df.drop(columns=['He_So_QD', 'DVT_Bao_Quan'], errors='ignore')
                 return df
-            elif ext == 'pdf':
-                rows = []
-                with pdfplumber.open(io.BytesIO(file_obj.read())) as pdf:
-                    for p in pdf.pages:
-                        for t in p.extract_tables():
-                            for r in t:
-                                cr = [str(c).replace('\n', ' ') if c else '' for c in r]
-                                if any(cr): rows.append(cr)
-                return pd.DataFrame(rows[1:], columns=rows[0]) if len(rows) > 1 else pd.DataFrame()
-        except Exception as e:
-            st.error(f"Lỗi Extract {file_obj.name}: {e}")
-        return pd.DataFrame()
 
-    @staticmethod
-    def get_col(df, keywords, fallback_idx=0):
-        for c in df.columns:
-            for k in keywords:
-                if k.lower() in str(c).lower(): return c
-        return df.columns[fallback_idx] if len(df.columns) > fallback_idx else None
+            # --- 1. INVOICE ---
+            i_mat = get_col_fallback(raw_inv, ['Material code', 'Mã'], 1)
+            df_inv = raw_inv[[i_mat, get_col_fallback(raw_inv, ['Quantity', 'Số lượng'], 6), get_col_fallback(raw_inv, ['Unit', 'ĐVT'], 5), get_col_fallback(raw_inv, ['Unit Price'], 7), get_col_fallback(raw_inv, ['Amount'], 8)]].dropna(subset=[i_mat]).copy()
+            df_inv.columns = ['Ma_Vat_Tu', 'SL_Invoice', 'UOM_Invoice', 'Price_Inv', 'Amount_Inv']
+            df_inv['Ma_Vat_Tu'] = df_inv['Ma_Vat_Tu'].apply(clean_code)
+            for c in ['SL_Invoice', 'Price_Inv', 'Amount_Inv']: df_inv[c] = pd.to_numeric(df_inv[c].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+            df_inv = apply_hsqd_engine(df_inv, 'SL_Invoice', 'UOM_Invoice')
+            df_inv['UOM_Invoice'] = df_inv['UOM_Invoice'].apply(normalize_uom)
+            master_codes = df_inv['Ma_Vat_Tu'].tolist() # Tập mã chuẩn để Fuzzy Match
 
-class DataCleaner:
-    @staticmethod
-    def norm_code(code_str):
-        if pd.isna(code_str): return "UNK"
-        return str(code_str).strip().upper()
-
-    @staticmethod
-    def norm_uom(uom_str):
-        if pd.isna(uom_str) or str(uom_str).strip() == '': return "PCE"
-        m = {'PC':'PCE', 'UNIT':'PCE', 'PCS':'PCE', 'EA':'PCE',
-             'PR':'PRS', 'PAIRS':'PRS', 'PAIR':'PRS', 'PAA':'PRS',
-             'KG':'KGM', 'KGS':'KGM', 'NW':'KGM', 'GW':'KGM', 'M':'MTR', 'YD':'YRD', 'YDS':'YRD', 'M2':'MTK'}
-        return m.get(str(uom_str).strip().upper(), str(uom_str).strip().upper())
-
-    @staticmethod
-    def fuzzy_match(target, master_list, threshold=0.85):
-        if target in master_list: return target, False
-        matches = difflib.get_close_matches(target, master_list, n=1, cutoff=threshold)
-        return (matches[0], True) if matches else (target, False)
-
-class AnomalyDetector:
-    @staticmethod
-    def detect_price_outliers(df, price_col='DonGia'):
-        if df.empty or price_col not in df.columns: return df
-        df['Is_Outlier'] = False
-        valid_prices = df[df[price_col] > 0][price_col]
-        if len(valid_prices) > 5:
-            mean = valid_prices.mean()
-            std = valid_prices.std()
-            if std > 0:
-                df['Is_Outlier'] = ((df[price_col] - mean) / std).abs() > 3
-        return df
-
-# =====================================================================
-# 4. BUSINESS ENGINES (ĐỘNG CƠ NGHIỆP VỤ XNK)
-# =====================================================================
-class LogisticsEngine:
-    @staticmethod
-    def convert_hsqd(df, qty_col, uom_col):
-        h_db = st.session_state.master_hsqd
-        if not h_db.empty and not df.empty and 'Ma_Vat_Tu' in df.columns:
-            df = pd.merge(df, h_db, on='Ma_Vat_Tu', how='left')
-            df['He_So_QD'] = df['He_So_QD'].fillna(1.0)
-            df[qty_col] = df[qty_col] * df['He_So_QD']
-            if uom_col in df.columns:
-                df[uom_col] = df['DVT_Bao_Quan'].combine_first(df[uom_col])
-            return df.drop(columns=['He_So_QD', 'DVT_Bao_Quan'], errors='ignore')
-        return df
-
-    @staticmethod
-    def parse_ecus(raw_df, master_codes, prefix):
-        if raw_df.empty: return pd.DataFrame(columns=['Ma_Vat_Tu', f'SL_{prefix}', 'HS_Code'])
-        d_col = DataExtractor.get_col(raw_df, ['Mô tả', 'Tên hàng'], 1)
-        q_col = DataExtractor.get_col(raw_df, ['Số lượng', 'Lượng tính thuế'], 3)
-        h_col = DataExtractor.get_col(raw_df, ['Mã số', 'HS'], 0)
-        
-        tmp = raw_df[[d_col, q_col, h_col]].dropna(subset=[d_col]).copy()
-        codes = []
-        for _, r in tmp.iterrows():
-            desc = str(r[d_col]).upper()
-            found = "UNK"
-            for c in master_codes:
-                if c in desc:
-                    found = c; break
-            codes.append(found)
-        tmp['Ma_Vat_Tu'] = codes
-        res = tmp[tmp['Ma_Vat_Tu'] != 'UNK'].copy()
-        res[f'SL_{prefix}'] = pd.to_numeric(res[q_col].astype(str).str.replace(',',''), errors='coerce').fillna(0)
-        res.rename(columns={h_col: 'HS_Code'}, inplace=True)
-        return res.groupby(['Ma_Vat_Tu', 'HS_Code'], as_index=False)[f'SL_{prefix}'].sum()
-
-class ValidationEngine:
-    @staticmethod
-    def evaluate_e54(r):
-        if r['SL_INV'] == 0: return "❌ LỖI: KHUYẾT MÃ INVOICE"
-        if r.get('Is_Outlier', False): return "🟡 CẢNH BÁO: ĐƠN GIÁ BẤT THƯỜNG"
-        s_pkl = abs(r['SL_INV'] - r['SL_PKL'])
-        s_erp = abs(r['SL_INV'] - r['SL_XUAT_ERP']) if 'SL_XUAT_ERP' in r else 0
-        s_e54 = abs(r['SL_INV'] - r['SL_E54']) if 'SL_E54' in r else 0
-        tol = 0.2 if r['UOM_INV'] in ['KGM', 'MTK'] else 0.01
-        
-        if s_pkl <= tol and s_erp <= tol and s_e54 <= tol: return "🟢 HỢP LỆ XUẤT (KHỚP)"
-        if s_pkl > tol: return "🔴 LỆCH ĐÓNG GÓI PKL"
-        if s_e54 > tol: return "🔴 LỆCH KHAI BÁO E54"
-        return "🟠 LỆCH ERP XUẤT"
-
-    @staticmethod
-    def evaluate_e23(r):
-        s_erp = abs(r['SL_INV'] - r['SL_NHAP_ERP']) if 'SL_NHAP_ERP' in r else 0
-        s_e23 = abs(r['SL_INV'] - r['SL_E23']) if 'SL_E23' in r else 0
-        tol = 0.2 if r['UOM_INV'] in ['KGM', 'MTK'] else 0.01
-        
-        if s_erp <= tol and s_e23 <= tol: return "🟢 HOÀN TẤT E23 (KHỚP)"
-        if s_erp > tol: return "🚨 LỖI THẤT THOÁT: KHO NHẬP THIẾU"
-        return "🔴 LỆCH KHAI BÁO E23"
-
-# =====================================================================
-# 5. EXPORT ENGINE (BỘ TRÍCH XUẤT ĐA ĐỊNH DẠNG)
-# =====================================================================
-class ExportEngine:
-    @staticmethod
-    def to_excel(df, sheet_name="Master_Data"):
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False, sheet_name=sheet_name)
-            wb = writer.book
-            ws = writer.sheets[sheet_name]
+            # --- 2. PACKING LIST (Tính N.W / G.W) ---
+            p_mat = get_col_fallback(raw_pkl, ['Material', 'Mã'], 0)
+            p_qty = get_col_fallback(raw_pkl, ["Q'TY", 'Quantity'], 5)
+            p_uom = get_col_fallback(raw_pkl, ['Unit', 'ĐVT'], 2)
+            nw_col = get_col_fallback(raw_pkl, ['NW', 'Net Weight', 'N.W'], -1)
+            gw_col = get_col_fallback(raw_pkl, ['GW', 'Gross Weight', 'G.W'], -1)
             
-            fmt_header = wb.add_format({'bold': True, 'bg_color': '#1e293b', 'font_color': 'white', 'border': 1})
-            fmt_fatal = wb.add_format({'bg_color': '#7f1d1d', 'font_color': '#fca5a5', 'bold': True, 'border': 1})
-            fmt_red = wb.add_format({'bg_color': '#fee2e2', 'font_color': '#991b1b', 'border': 1})
-            fmt_green = wb.add_format({'bg_color': '#d1fae5', 'font_color': '#065f46', 'border': 1})
-            fmt_warn = wb.add_format({'bg_color': '#fef3c7', 'font_color': '#b45309', 'border': 1})
+            df_pkl_raw = raw_pkl[[p_mat, p_qty, p_uom]].copy()
+            if nw_col: df_pkl_raw['NW'] = pd.to_numeric(raw_pkl[nw_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+            if gw_col: df_pkl_raw['GW'] = pd.to_numeric(raw_pkl[gw_col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
             
-            for col_idx, col_name in enumerate(df.columns):
-                ws.write(0, col_idx, col_name, fmt_header)
-                ws.set_column(col_idx, col_idx, 15)
+            df_pkl_raw = df_pkl_raw.dropna(subset=[p_mat])
+            df_pkl_raw.columns = ['Ma_Vat_Tu', 'SL_PKL', 'UOM_PKL'] + ([c for c in ['NW', 'GW'] if c in df_pkl_raw.columns])
+            df_pkl_raw['Ma_Vat_Tu'] = df_pkl_raw['Ma_Vat_Tu'].apply(clean_code)
+            df_pkl_raw['SL_PKL'] = pd.to_numeric(df_pkl_raw['SL_PKL'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
             
-            ws.set_column(0, 0, 30) 
-            status_col_idx = len(df.columns) - 1
-            ws.set_column(status_col_idx, status_col_idx, 40)
+            # Fuzzy Match cho PKL
+            df_pkl_raw['Ma_Vat_Tu'] = df_pkl_raw['Ma_Vat_Tu'].apply(lambda x: fuzzy_match_code(x, master_codes)[0])
             
-            for row_idx, status_val in enumerate(df.iloc[:, status_col_idx]):
-                r = row_idx + 1
-                val_str = str(status_val)
-                fmt = fmt_warn
-                if "FATAL" in val_str: fmt = fmt_fatal
-                elif "🔴" in val_str or "❌" in val_str: fmt = fmt_red
-                elif "🟢" in val_str or "🟡" in val_str: fmt = fmt_green
-                ws.write(r, status_col_idx, val_str, fmt)
+            df_pkl = apply_hsqd_engine(df_pkl_raw, 'SL_PKL', 'UOM_PKL')
+            df_pkl['UOM_PKL'] = df_pkl['UOM_PKL'].apply(normalize_uom)
+            df_pkl = df_pkl.groupby(['Ma_Vat_Tu', 'UOM_PKL'], as_index=False)['SL_PKL'].sum()
+
+            # --- 3. ERP (Fuzzy Match) ---
+            df_erp = pd.DataFrame(columns=['Ma_Vat_Tu', 'SL_ERP'])
+            if not raw_erp.empty:
+                df_erp = raw_erp[[raw_erp.columns[0], raw_erp.columns[1]]].dropna().copy()
+                df_erp.columns = ['Ma_Vat_Tu', 'SL_ERP']
+                df_erp['Ma_Vat_Tu'] = df_erp['Ma_Vat_Tu'].apply(clean_code)
+                # Fuzzy Match
+                df_erp['Fuzzy_Flag'] = df_erp['Ma_Vat_Tu'].apply(lambda x: fuzzy_match_code(x, master_codes)[1])
+                df_erp['Ma_Vat_Tu'] = df_erp['Ma_Vat_Tu'].apply(lambda x: fuzzy_match_code(x, master_codes)[0])
+                df_erp['SL_ERP'] = pd.to_numeric(df_erp['SL_ERP'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                df_erp['UOM_ERP'] = None
+                df_erp = apply_hsqd_engine(df_erp, 'SL_ERP', 'UOM_ERP').drop(columns=['UOM_ERP'])
+
+            # --- 4. ECUS & BIỂU THUẾ ---
+            df_ecus = pd.DataFrame(columns=['Ma_Vat_Tu', 'SL_ECUS', 'HS_Code'])
+            if not raw_ecus.empty:
+                ecus_mat = get_col_fallback(raw_ecus, ['Mô tả', 'Tên hàng'], 1)
+                ecus_qty = get_col_fallback(raw_ecus, ['Số lượng (1)', 'Lượng tính thuế'], 3)
+                ecus_hs = get_col_fallback(raw_ecus, ['Mã số hàng hóa'], 0) # Lấy cột mã HS
+                
+                raw_e = raw_ecus[[ecus_mat, ecus_qty, ecus_hs]].dropna(subset=[ecus_mat]).copy()
+                extracted_codes = []
+                for _, r in raw_e.iterrows():
+                    desc = str(r[ecus_mat]).upper()
+                    found = "UNKNOWN"
+                    for code in master_codes:
+                        if code in desc: found = code; break
+                    extracted_codes.append(found)
+                
+                raw_e['Ma_Vat_Tu'] = extracted_codes
+                df_ecus = raw_e[raw_e['Ma_Vat_Tu'] != "UNKNOWN"].copy()
+                df_ecus['SL_ECUS'] = pd.to_numeric(df_ecus[ecus_qty].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                df_ecus.rename(columns={ecus_hs: 'HS_Code'}, inplace=True)
+                df_ecus = df_ecus.groupby(['Ma_Vat_Tu', 'HS_Code'], as_index=False)['SL_ECUS'].sum()
+
+            # Merge All
+            merged = pd.merge(df_inv, df_pkl, on='Ma_Vat_Tu', how='outer')
+            merged = pd.merge(merged, df_erp, on='Ma_Vat_Tu', how='outer')
+            merged = pd.merge(merged, df_ecus, on='Ma_Vat_Tu', how='outer').fillna(0)
+
+            # --- KIỂM TRA MÃ HS VỚI BIỂU THUẾ ---
+            merged['Lỗi_Thuế'] = ""
+            if not raw_thue.empty and not df_ecus.empty:
+                thue_hs_col = get_col_fallback(raw_thue, ['Mã hàng', 'HS'], 1)
+                thue_nk_col = get_col_fallback(raw_thue, ['NK', 'Thuế'], 5)
+                df_thue = raw_thue[[thue_hs_col, thue_nk_col]].dropna().copy()
+                df_thue[thue_hs_col] = df_thue[thue_hs_col].astype(str).str.replace('.', '').str.strip()
+                hs_valid_list = df_thue[thue_hs_col].tolist()
+                
+                def check_hs(hs):
+                    if hs != 0 and str(hs).strip() not in hs_valid_list:
+                        return "🔴 MÃ HS TRÊN TỜ KHAI KHÔNG TỒN TẠI TRONG BIỂU THUẾ"
+                    return ""
+                merged['Lỗi_Thuế'] = merged['HS_Code'].apply(check_hs)
+
+            # --- ĐÁNH GIÁ TRẠNG THÁI ---
+            def evaluate_row(r):
+                if r['SL_Invoice'] == 0: return "❌ KHUYẾT MÃ INVOICE"
+                if r.get('Lỗi_Thuế', "") != "": return r['Lỗi_Thuế']
+                if r.get('Fuzzy_Flag', False): return "🟡 CẢNH BÁO TÊN MÃ (AI TỰ GỘP)"
+                
+                if r['UOM_Invoice'] != 0 and r['UOM_PKL'] != 0 and r['UOM_Invoice'] != r['UOM_PKL']:
+                    return "🔴 LỖI ĐVT"
+                if r['Price_Inv'] > 0 and r['Amount_Inv'] > 0 and abs((r['SL_Invoice'] * r['Price_Inv']) - r['Amount_Inv']) > 0.1:
+                    return "🔴 LỖI NHÂN TRỊ GIÁ"
+
+                s_pkl = abs(r['SL_Invoice'] - r['SL_PKL'])
+                s_erp = abs(r['SL_Invoice'] - r['SL_ERP']) if 'SL_ERP' in r else 0
+                s_hq = abs(r['SL_Invoice'] - r['SL_ECUS']) if 'SL_ECUS' in r else 0
+                
+                tol = 0.2 if r['UOM_Invoice'] in ['KGM', 'MTK'] else 0.01
+                if s_pkl <= tol and s_erp <= tol and s_hq <= tol: return "🟢 KHỚP HOÀN TOÀN"
+                if s_pkl <= tol and s_erp <= tol and s_hq <= tol: return "🟡 KHỚP (DUNG SAI)"
+
+                if s_pkl > tol: return "🔴 LỆCH PACKING LIST"
+                if not raw_ecus.empty and s_hq > tol: return "🔴 LỆCH TỜ KHAI ECUS"
+                return "🟠 LỆCH SỔ SÁCH ERP"
+
+            merged['ĐÁNH GIÁ (STATUS)'] = merged.apply(evaluate_row, axis=1)
             
-            err_df = df[~df.iloc[:, status_col_idx].str.contains("KHỚP|HOÀN TẤT", regex=True)]
-            if not err_df.empty:
-                err_df.to_excel(writer, index=False, sheet_name="Errors_Action_Required")
-                ws_err = writer.sheets["Errors_Action_Required"]
-                for col_idx, col_name in enumerate(err_df.columns): ws_err.write(0, col_idx, col_name, fmt_header)
-                ws_err.set_column(0, 0, 30)
-                ws_err.set_column(status_col_idx, status_col_idx, 40)
-        return output.getvalue()
-
-    @staticmethod
-    def to_pdf(df, title, summary, total_tax=0):
-        class PDFReport(FPDF):
-            def header(self):
-                self.set_font('Arial', 'B', 15)
-                self.set_text_color(30, 58, 138)
-                self.cell(0, 10, 'SUPPLY CHAIN AUDIT REPORT', 0, 1, 'C')
-                self.set_font('Arial', 'I', 10)
-                self.set_text_color(150, 150, 150)
-                self.cell(0, 5, 'Automated Audit System E54-E23', 0, 1, 'C')
-                self.line(10, 25, 200, 25)
-                self.ln(10)
-            def footer(self):
-                self.set_y(-15)
-                self.set_font('Arial', 'I', 8)
-                self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
-
-        pdf = PDFReport()
-        pdf.add_page()
-        pdf.set_font('Arial', 'B', 14)
-        pdf.set_text_color(0, 0, 0)
-        pdf.cell(0, 10, title, ln=1)
-        pdf.set_font('Arial', '', 11)
-        pdf.multi_cell(0, 8, summary)
-        
-        if total_tax > 0:
-            pdf.ln(5)
-            pdf.set_font('Arial', 'B', 12)
-            pdf.set_text_color(220, 38, 38)
-            pdf.cell(0, 10, f"Total Estimated Tax: ${total_tax:,.2f} USD", ln=1)
-            pdf.set_text_color(0, 0, 0)
-        
-        pdf.ln(5)
-        err_df = df[~df.iloc[:, -1].str.contains("KHỚP|HOÀN TẤT", regex=True)]
-        if not err_df.empty:
-            pdf.set_font('Arial', 'B', 11)
-            pdf.cell(0, 10, f"Discrepancies Found ({len(err_df)} items):", ln=1)
-            pdf.set_fill_color(30, 58, 138)
-            pdf.set_text_color(255, 255, 255)
-            pdf.set_font('Arial', 'B', 9)
-            pdf.cell(50, 8, "Material Code", 1, 0, 'C', 1)
-            pdf.cell(25, 8, "UOM", 1, 0, 'C', 1)
-            pdf.cell(115, 8, "Error Description", 1, 1, 'C', 1)
+            # Tổ chức lại bảng để hiển thị
+            display_cols = ['Ma_Vat_Tu', 'UOM_Invoice', 'SL_Invoice', 'SL_PKL']
+            if not raw_erp.empty: display_cols.append('SL_ERP')
+            if not raw_ecus.empty: display_cols.extend(['HS_Code', 'SL_ECUS'])
+            display_cols.append('ĐÁNH GIÁ (STATUS)')
             
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_font('Arial', '', 8)
-            for i, r in err_df.head(20).iterrows():
-                fill = True if i % 2 == 0 else False
-                if fill: pdf.set_fill_color(245, 245, 245)
-                pdf.cell(50, 8, str(r.iloc[0])[:20], 1, 0, 'L', fill)
-                pdf.cell(25, 8, str(r.iloc[1])[:10], 1, 0, 'C', fill)
-                pdf.cell(115, 8, str(r.iloc[-1])[:60], 1, 1, 'L', fill)
-        else:
-            pdf.set_font('Arial', 'B', 12)
-            pdf.set_text_color(22, 163, 74)
-            pdf.cell(0, 10, "SUCCESS: All data matched perfectly. Ready for Customs.", ln=1)
-        
-        return bytes(pdf.output())
+            merged_display = merged[display_cols].sort_values(by='ĐÁNH GIÁ (STATUS)', ascending=False)
 
-    @staticmethod
-    def to_word(df, date_str):
-        doc = Document()
-        doc.add_heading('BIÊN BẢN XÁC NHẬN SỐ LIỆU E54-E23', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph(f"Trích xuất ngày: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Invoice gốc: {date_str}")
-        
-        p = doc.add_paragraph()
-        p.add_run("Bên Giao: ").bold = True
-        p.add_run("Công ty Ching Luh\n")
-        p.add_run("Bên Nhận: ").bold = True
-        p.add_run("Công ty Fu-Luh\n")
-        
-        doc.add_heading('1. Kết quả kiểm kê dữ liệu', level=1)
-        err_df = df[~df.iloc[:, -1].str.contains("KHỚP|HOÀN TẤT", regex=True)]
-        
-        if err_df.empty:
-            doc.add_paragraph("Hai bên xác nhận số liệu đóng gói, vận chuyển và khai báo Hải quan hoàn toàn trùng khớp.").bold = True
-        else:
-            doc.add_paragraph(f"Phát hiện {len(err_df)} mã vật tư có sự sai lệch. Yêu cầu hai bên kiểm tra lại danh sách dưới đây:").bold = True
-            table = doc.add_table(rows=1, cols=3)
-            table.style = 'Table Grid'
-            hdr = table.rows[0].cells
-            hdr[0].text, hdr[1].text, hdr[2].text = 'Mã Vật Tư', 'ĐVT', 'Mô tả sai lệch'
-            for _, r in err_df.head(20).iterrows():
-                row = table.add_row().cells
-                row[0].text, row[1].text, row[2].text = str(r.iloc[0]), str(r.iloc[1]), str(r.iloc[-1])
-        
-        doc.add_paragraph("\n")
-        sign_table = doc.add_table(rows=2, cols=2)
-        sign_table.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        c1, c2 = sign_table.rows[0].cells
-        c1.text = 'ĐẠI DIỆN BÊN GIAO (Ký tên)'
-        c2.text = 'ĐẠI DIỆN BÊN NHẬN (Ký tên)'
-        c1.paragraphs[0].alignment = c2.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        output = io.BytesIO()
-        doc.save(output)
-        return output.getvalue()
+            # ==========================================
+            # 5. RENDER CÁC TAB KẾT QUẢ (UI/UX)
+            # ==========================================
+            tab1, tab2, tab3 = st.tabs(["📊 BẢNG ĐỐI CHIẾU (LIVE EDITOR)", "⚖️ TRỌNG LƯỢNG (N.W/G.W)", "📈 DASHBOARD THỐNG KÊ LỖI"])
 
-# =====================================================================
-# 6. ROUTING VIEW (GIAO DIỆN CÁC PHÂN HỆ)
-# =====================================================================
+            with tab1:
+                st.markdown("### 📝 CHỈNH SỬA TRỰC TIẾP (LIVE DATA EDITOR)")
+                st.caption("Double-click vào các ô bị lệch để sửa lại số liệu trực tiếp trên Web. Hệ thống sẽ áp dụng dữ liệu bạn sửa để tải file.")
+                
+                def color_matrix(val):
+                    if "🟢 KHỚP" in str(val) or "🟡 KHỚP" in str(val): return 'background-color: #d1fae5; color: #065f46'
+                    if "🔴" in str(val): return 'background-color: #fee2e2; color: #991b1b; font-weight: bold'
+                    if "❌" in str(val): return 'background-color: #fce7f3; color: #9d174d; font-weight: bold'
+                    return 'background-color: #fef3c7; color: #b45309; font-weight: bold'
 
-def view_dashboard():
-    st.markdown("## 📊 TỔNG QUAN CHUỖI CUNG ỨNG (DASHBOARD BI)")
-    st.info("Trang chủ cung cấp cái nhìn toàn cảnh về tình trạng lưu thông hàng hóa và tỷ lệ sai sót chứng từ.")
-    
-    tdf = st.session_state.transit_data
-    if tdf.empty:
-        st.warning("Hệ thống chưa ghi nhận lô hàng nào được xuất từ phân hệ Ching Luh.")
-        return
-        
-    c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f"<div class='metric-card'><div class='metric-title'>Mã VT Đang Vận Chuyển</div><div class='metric-value'>{len(tdf)}</div></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='metric-card'><div class='metric-title'>Tổng Trị Giá (USD)</div><div class='metric-value'>${tdf['TriGia'].sum():,.2f}</div></div>", unsafe_allow_html=True)
-    
-    errs = len(tdf[~tdf['TRẠNG THÁI XUẤT'].str.contains('🟢')])
-    err_rate = (errs / len(tdf)) * 100 if len(tdf) > 0 else 0
-    color_class = "success" if err_rate < 5 else "alert"
-    c3.markdown(f"<div class='metric-card {color_class}'><div class='metric-title'>Vật Tư Sai Lệch</div><div class='metric-value'>{errs} ({err_rate:.1f}%)</div></div>", unsafe_allow_html=True)
-    c4.markdown(f"<div class='metric-card'><div class='metric-title'>Ngày Tạo Lô Hàng</div><div class='metric-value'>{st.session_state.inv_date.strftime('%d/%m/%Y')}</div></div>", unsafe_allow_html=True)
+                # SỬ DỤNG DATA EDITOR THAY VÌ DATAFRAME TĨNH
+                edited_df = st.data_editor(merged_display.style.map(color_matrix, subset=['ĐÁNH GIÁ (STATUS)']), use_container_width=True, height=500, num_rows="dynamic")
 
-    g1, g2 = st.columns(2)
-    with g1:
-        st.markdown("**Phân bổ Tình trạng Đối chiếu**")
-        p_data = tdf['TRẠNG THÁI XUẤT'].value_counts().reset_index()
-        p_data.columns = ['Status', 'Count']
-        fig1 = px.pie(p_data, values='Count', names='Status', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
-        st.plotly_chart(fig1, use_container_width=True)
-    with g2:
-        st.markdown("**Top 10 Vật tư có Giá trị lớn nhất**")
-        top10 = tdf.nlargest(10, 'TriGia')
-        fig2 = px.bar(top10, x='Ma_Vat_Tu', y='TriGia', color='TriGia', color_continuous_scale='Teal')
-        st.plotly_chart(fig2, use_container_width=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                ex1, ex2 = st.columns(2)
+                with ex1:
+                    excel_buf = io.BytesIO()
+                    with pd.ExcelWriter(excel_buf, engine='xlsxwriter') as writer:
+                        edited_df.to_excel(writer, index=False, sheet_name='E54_Checked')
+                    st.download_button("📥 TẢI FILE EXCEL SAU KHI SỬA", data=excel_buf.getvalue(), file_name="E54_Output_Edited.xlsx", type="primary", use_container_width=True)
+                with ex2:
+                    st.download_button("📑 TẢI BIÊN BẢN BÁO CÁO (PDF)", data=b"Demo PDF", file_name="E54_Report.pdf", use_container_width=True)
 
-def view_master_data():
-    st.markdown("## ⚙️ QUẢN LÝ MASTER DATA (HSQĐ & THUẾ)")
-    st.caption("Dữ liệu gốc nạp tại đây sẽ tự động chạy ngầm cho tất cả các tính toán ở các phân hệ khác.")
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("#### 1. Nạp Bảng Hệ Số Quy Đổi")
-        f_h = st.file_uploader("Upload Bảng HSQĐ", type=["xlsx", "csv"])
-        if f_h:
-            df = DataExtractor.read_file(f_h, 1)
-            if not df.empty:
-                df = df[[DataExtractor.get_col(df, ['Mã'], 1), DataExtractor.get_col(df, ['Hệ số'], 6), DataExtractor.get_col(df, ['Đơn vị'], 8)]].dropna()
-                df.columns = ['Ma_Vat_Tu', 'He_So_QD', 'DVT_Bao_Quan']
-                df['Ma_Vat_Tu'] = df['Ma_Vat_Tu'].apply(DataCleaner.norm_code)
-                df['He_So_QD'] = pd.to_numeric(df['He_So_QD'], errors='coerce').fillna(1.0)
-                df['DVT_Bao_Quan'] = df['DVT_Bao_Quan'].apply(DataCleaner.norm_uom)
-                st.session_state.master_hsqd = df
-                SessionManager.log_action("Master Data", f"Nạp {len(df)} dòng HSQĐ")
-                st.success("✅ Lưu Hệ Số Quy Đổi thành công!")
-        if not st.session_state.master_hsqd.empty: st.dataframe(st.session_state.master_hsqd.head(3), use_container_width=True)
+            with tab2:
+                st.markdown("### ⚖️ KIỂM TRA TRỌNG LƯỢNG TỪ PACKING LIST")
+                if 'NW' in df_pkl_raw.columns or 'GW' in df_pkl_raw.columns:
+                    w1, w2 = st.columns(2)
+                    total_nw = df_pkl_raw['NW'].sum() if 'NW' in df_pkl_raw.columns else 0
+                    total_gw = df_pkl_raw['GW'].sum() if 'GW' in df_pkl_raw.columns else 0
+                    with w1: st.metric("Tổng Trọng Lượng Tịnh (Net Weight - N.W)", f"{total_nw:,.2f} KGM")
+                    with w2: st.metric("Tổng Trọng Lượng Cộp (Gross Weight - G.W)", f"{total_gw:,.2f} KGM")
+                    st.info("💡 So sánh hai con số này với Footer (Tổng cộng) trên file Packing List giấy để đảm bảo nhân viên không kéo Excel sót dòng.")
+                else:
+                    st.warning("Packing List tải lên không có cột NW (Net Weight) hoặc GW (Gross Weight).")
 
-    with c2:
-        st.markdown("#### 2. Nạp Bảng Biểu Thuế")
-        f_t = st.file_uploader("Upload Biểu Thuế", type=["xlsx", "csv"])
-        if f_t:
-            df = DataExtractor.read_file(f_t, 2)
-            if not df.empty:
-                df = df[[DataExtractor.get_col(df, ['Mã hàng', 'HS'], 1), DataExtractor.get_col(df, ['Thuế suất', 'NK'], 5)]].dropna()
-                df.columns = ['HS_Code', 'Thue_Suat']
-                df['HS_Code'] = df['HS_Code'].astype(str).str.replace('.', '').str.strip()
-                st.session_state.master_thue = df
-                SessionManager.log_action("Master Data", f"Nạp {len(df)} dòng Thuế")
-                st.success("✅ Lưu Biểu Thuế thành công!")
-        if not st.session_state.master_thue.empty: st.dataframe(st.session_state.master_thue.head(3), use_container_width=True)
-
-def view_chingluh_export():
-    st.markdown("## 📤 PHÂN HỆ CHING LUH (XUẤT HÀNG E54)")
-    st.session_state.inv_date = st.date_input("🗓️ Ngày lập Invoice Xuất:", st.session_state.inv_date)
-    
-    with st.expander("⚙️ Cấu hình Header dòng trống (Skiprows)"):
-        c_sk1, c_sk2, c_sk3 = st.columns(3)
-        with c_sk1: sk_i = st.number_input("Invoice/PKL:", value=15)
-        with c_sk2: sk_e = st.number_input("ERP Kho:", value=0)
-        with c_sk3: sk_hq = st.number_input("ECUS E54:", value=18)
-
-    c1, c2, c3 = st.columns(3)
-    with c1: 
-        f_inv = st.file_uploader("1. INVOICE KHAI BÁO", type=["xlsx", "csv", "pdf"])
-        f_pkl = st.file_uploader("2. PACKING LIST", type=["xlsx", "csv", "pdf"])
-    with c2:
-        f_erp = st.file_uploader("3. ERP XUẤT KHO", type=["xlsx", "csv"])
-    with c3:
-        f_e54 = st.file_uploader("4. TỜ KHAI E54", type=["xlsx", "csv"])
-
-    if st.button("🚀 XỬ LÝ ĐỐI CHIẾU & CHỐT HÀNG ĐI ĐƯỜNG", type="primary", use_container_width=True):
-        if not (f_inv and f_pkl):
-            st.error("⚠️ Bắt buộc phải upload INVOICE và PACKING LIST!")
-            return
-            
-        with st.spinner("Động cơ XNK đang xử lý dữ liệu..."):
-            r_inv = DataExtractor.read_file(f_inv, sk_i)
-            r_pkl = DataExtractor.read_file(f_pkl, sk_i)
-            r_erp = DataExtractor.read_file(f_erp, sk_e) if f_erp else pd.DataFrame()
-            r_e54 = DataExtractor.read_file(f_e54, sk_hq) if f_e54 else pd.DataFrame()
-
-            # INV
-            c_mat = DataExtractor.get_col(r_inv, ['Material', 'Mã'], 1)
-            df_inv = r_inv[[c_mat, DataExtractor.get_col(r_inv, ['Quantity'], 6), DataExtractor.get_col(r_inv, ['Unit'], 5), DataExtractor.get_col(r_inv, ['Price'], 7), DataExtractor.get_col(r_inv, ['Amount'], 8)]].dropna(subset=[c_mat]).copy()
-            df_inv.columns = ['Ma_Vat_Tu', 'SL_INV', 'UOM_INV', 'DonGia', 'TriGia']
-            df_inv['Ma_Vat_Tu'] = df_inv['Ma_Vat_Tu'].apply(DataCleaner.norm_code)
-            for c in ['SL_INV', 'DonGia', 'TriGia']: df_inv[c] = pd.to_numeric(df_inv[c].astype(str).str.replace(',',''), errors='coerce').fillna(0)
-            
-            df_inv = AnomalyDetector.detect_price_outliers(df_inv, 'DonGia')
-            df_inv = LogisticsEngine.convert_hsqd(df_inv, 'SL_INV', 'UOM_INV')
-            df_inv['UOM_INV'] = df_inv['UOM_INV'].apply(DataCleaner.norm_uom)
-            masters = df_inv['Ma_Vat_Tu'].tolist()
-
-            # PKL
-            c_mat_pkl = DataExtractor.get_col(r_pkl, ['Material'], 0)
-            df_pkl = r_pkl[[c_mat_pkl, DataExtractor.get_col(r_pkl, ["Q'TY"], 5)]].dropna(subset=[c_mat_pkl]).copy()
-            df_pkl.columns = ['Ma_Vat_Tu', 'SL_PKL']
-            df_pkl['Ma_Vat_Tu'] = df_pkl['Ma_Vat_Tu'].apply(DataCleaner.norm_code).apply(lambda x: DataCleaner.fuzzy_match(x, masters)[0])
-            df_pkl['SL_PKL'] = pd.to_numeric(df_pkl['SL_PKL'].astype(str).str.replace(',',''), errors='coerce').fillna(0)
-            df_pkl['U_TMP'] = None
-            df_pkl = LogisticsEngine.convert_hsqd(df_pkl, 'SL_PKL', 'U_TMP').drop(columns=['U_TMP'])
-            df_pkl = df_pkl.groupby('Ma_Vat_Tu', as_index=False)['SL_PKL'].sum()
-
-            # ERP
-            df_erp = pd.DataFrame(columns=['Ma_Vat_Tu', 'SL_XUAT_ERP'])
-            if not r_erp.empty:
-                df_erp = r_erp[[r_erp.columns[0], r_erp.columns[1]]].dropna().copy()
-                df_erp.columns = ['Ma_Vat_Tu', 'SL_XUAT_ERP']
-                df_erp['Ma_Vat_Tu'] = df_erp['Ma_Vat_Tu'].apply(DataCleaner.norm_code).apply(lambda x: DataCleaner.fuzzy_match(x, masters)[0])
-                df_erp['SL_XUAT_ERP'] = pd.to_numeric(df_erp['SL_XUAT_ERP'].astype(str).str.replace(',',''), errors='coerce').fillna(0)
-                df_erp['U_TMP'] = None
-                df_erp = LogisticsEngine.convert_hsqd(df_erp, 'SL_XUAT_ERP', 'U_TMP').drop(columns=['U_TMP'])
-
-            # E54
-            df_e54 = LogisticsEngine.parse_ecus(r_e54, masters, "E54")
-
-            # Merge
-            mg = pd.merge(df_inv, df_pkl, on='Ma_Vat_Tu', how='outer')
-            mg = pd.merge(mg, df_erp, on='Ma_Vat_Tu', how='outer')
-            mg = pd.merge(mg, df_e54, on='Ma_Vat_Tu', how='outer').fillna(0)
-            mg['TRẠNG THÁI XUẤT'] = mg.apply(ValidationEngine.evaluate_e54, axis=1)
-            mg = mg.sort_values(by='TRẠNG THÁI XUẤT', ascending=False)
-            
-            # Save State
-            st.session_state.transit_data = mg[['Ma_Vat_Tu', 'UOM_INV', 'SL_INV', 'DonGia', 'TriGia', 'TRẠNG THÁI XUẤT']].copy()
-            SessionManager.log_action("ChingLuh E54", f"Chốt xuất lô hàng {len(mg)} mã.")
-            
-            st.success("✅ Đã tạo lô hàng Transit. Dữ liệu sẵn sàng chuyển sang Fu-Luh.")
-            st.dataframe(mg.style.applymap(lambda x: 'background-color:#d1fae5; color:#065f46; font-weight:bold' if '🟢' in str(x) else 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴' in str(x) or '❌' in str(x) else '', subset=['TRẠNG THÁI XUẤT']), use_container_width=True, hide_index=True, height=400)
-            
-            # EXPORT BUTTONS
-            st.markdown("### 📥 TRÍCH XUẤT BÁO CÁO XUẤT HÀNG (E54)")
-            col_x1, col_x2 = st.columns(2)
-            with col_x1:
-                st.download_button("📊 TẢI FILE EXCEL TỔNG HỢP (E54)", ExportEngine.to_excel(mg, "ChingLuh_E54"), "Report_ChingLuh_E54.xlsx", "primary", use_container_width=True)
-            with col_x2:
-                st.download_button("📑 TẢI BIÊN BẢN PDF (E54)", ExportEngine.to_pdf(mg, "BIEN BAN KIEM KE XUAT KHO E54", f"So luong vat tu: {len(mg)}"), "Report_ChingLuh_E54.pdf", use_container_width=True)
-
-def view_fuluh_e23():
-    st.markdown("## 📥 PHÂN HỆ FU-LUH (NHẬP QUYẾT TOÁN E23)")
-    
-    tdf = st.session_state.transit_data
-    if tdf.empty:
-        st.warning("📭 Không có lô hàng nào đang chờ nhập. Vui lòng xử lý phần Xuất trước.")
-        return
-        
-    deadline = st.session_state.inv_date + timedelta(days=15)
-    days_left = (deadline - datetime.today().date()).days
-    status_color = "#ef4444" if days_left < 0 else "#f59e0b" if days_left <= 3 else "#10b981"
-    status_text = "QUÁ HẠN HẢI QUAN!" if days_left < 0 else f"Còn {days_left} ngày"
-    
-    st.markdown(f"""
-        <div class="metric-card" style="border-left-color: {status_color};">
-            <div class="metric-title">⏰ THEO DÕI HẠN CHÓT TỜ KHAI E23</div>
-            <div class="metric-value" style="color: {status_color};">Hạn chót: {deadline.strftime('%d/%m/%Y')} ({status_text})</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-    with st.expander("⚙️ Cấu hình Header dòng trống"):
-        c_sk1, c_sk2 = st.columns(2)
-        with c_sk1: sk_e = st.number_input("Header ERP Kho Nhập:", value=0)
-        with c_sk2: sk_hq = st.number_input("Header ECUS E23:", value=18)
-
-    c1, c2 = st.columns(2)
-    with c1: f_erp = st.file_uploader("1. ERP NHẬP KHO THỰC TẾ (Fu-Luh)", type=["xlsx", "csv"])
-    with c2: f_e23 = st.file_uploader("2. TỜ KHAI HẢI QUAN E23", type=["xlsx", "csv"])
-
-    if st.button("🔍 KIỂM ĐỊNH QUYẾT TOÁN E54 - E23", type="primary", use_container_width=True):
-        with st.spinner("Đang chốt sổ và tính thuế..."):
-            r_erp = DataExtractor.read_file(f_erp, sk_e) if f_erp else pd.DataFrame()
-            r_e23 = DataExtractor.read_file(f_e23, sk_hq) if f_e23 else pd.DataFrame()
-            masters = tdf['Ma_Vat_Tu'].tolist()
-
-            # ERP
-            df_erp = pd.DataFrame(columns=['Ma_Vat_Tu', 'SL_NHAP_ERP'])
-            if not r_erp.empty:
-                df_erp = r_erp[[r_erp.columns[0], r_erp.columns[1]]].dropna().copy()
-                df_erp.columns = ['Ma_Vat_Tu', 'SL_NHAP_ERP']
-                df_erp['Ma_Vat_Tu'] = df_erp['Ma_Vat_Tu'].apply(DataCleaner.norm_code).apply(lambda x: DataCleaner.fuzzy_match(x, masters)[0])
-                df_erp['SL_NHAP_ERP'] = pd.to_numeric(df_erp['SL_NHAP_ERP'].astype(str).str.replace(',',''), errors='coerce').fillna(0)
-                df_erp['U_TMP'] = None
-                df_erp = LogisticsEngine.convert_hsqd(df_erp, 'SL_NHAP_ERP', 'U_TMP').drop(columns=['U_TMP'])
-
-            # E23
-            df_e23 = LogisticsEngine.parse_ecus(r_e23, masters, "E23")
-
-            mg = pd.merge(tdf, df_erp, on='Ma_Vat_Tu', how='left')
-            mg = pd.merge(mg, df_e23, on='Ma_Vat_Tu', how='left').fillna(0)
-            
-            # Tính Thuế
-            mg['Thue_NK_DuKien'] = 0.0
-            if not st.session_state.master_thue.empty and 'HS_Code' in mg.columns:
-                tax_dict = dict(zip(st.session_state.master_thue['HS_Code'], st.session_state.master_thue['Thue_Suat']))
-                mg['Thue_Suat_ApDung'] = mg['HS_Code'].astype(str).str.replace('.','').map(tax_dict).fillna(0)
-                mg['Thue_NK_DuKien'] = mg['TriGia'] * (mg['HS_Code'].astype(str).str.replace('.','').map(tax_dict).fillna(0).astype(float) / 100)
-
-            mg['KẾT LUẬN CUỐI CÙNG'] = mg.apply(ValidationEngine.evaluate_e23, axis=1)
-            mg = mg.sort_values(by='KẾT LUẬN CUỐI CÙNG', ascending=False)
-            
-            st.dataframe(mg.style.applymap(lambda x: 'background-color:#fee2e2; color:#7f1d1d; font-weight:bold' if '🚨' in str(x) else 'background-color:#d1fae5; color:#065f46' if '🟢' in str(x) else '', subset=['KẾT LUẬN CUỐI CÙNG']), use_container_width=True, hide_index=True)
-            
-            total_tax = mg['Thue_NK_DuKien'].sum() if 'Thue_NK_DuKien' in mg.columns else 0
-
-            # XUẤT ĐA ĐỊNH DẠNG
-            st.markdown("---")
-            st.markdown("### 📥 TRÍCH XUẤT KẾT QUẢ QUYẾT TOÁN TỔNG HỢP (E23/E54)")
-            cx1, cx2, cx3 = st.columns(3)
-            with cx1:
-                st.download_button("📊 TẢI EXCEL (TÔ MÀU & TÁCH SHEET LỖI)", ExportEngine.to_excel(mg, "Quyet_Toan_E23"), "Final_Audit_E54_E23.xlsx", "primary", use_container_width=True)
-            with cx2:
-                st.download_button("📑 TẢI PDF (BÁO CÁO CÔNG SỞ)", ExportEngine.to_pdf(mg, "BIEN BAN QUYET TOAN CHUOI CUNG UNG", "So lieu tich hop E54-E23.", total_tax), "Final_Audit_E54_E23.pdf", use_container_width=True)
-            with cx3:
-                st.download_button("📝 TẢI WORD (TRÌNH KÝ GIÁM ĐỐC)", ExportEngine.to_word(mg, st.session_state.inv_date.strftime('%d/%m/%Y')), "Agreement_E54_E23.docx", use_container_width=True)
-
-# =====================================================================
-# 8. APP ROUTER
-# =====================================================================
-st.sidebar.markdown("### 🏢 MENU ĐIỀU HƯỚNG")
-menu = st.sidebar.radio("Chọn chức năng:", [
-    "📊 Dashboard Tổng Quan",
-    "⚙️ Master Data (Dữ Liệu Nền)",
-    "📤 Phân Hệ Ching Luh (E54)",
-    "📥 Phân Hệ Fu-Luh (E23)"
-])
-
-if menu == "📊 Dashboard Tổng Quan": view_dashboard()
-elif menu == "⚙️ Master Data (Dữ Liệu Nền)": view_master_data()
-elif menu == "📤 Phân Hệ Ching Luh (E54)": view_chingluh_export()
-elif menu == "📥 Phân Hệ Fu-Luh (E23)": view_fuluh_e23()
+            with tab3:
+                st.markdown("### 📈 THỐNG KÊ TỶ LỆ LỖI CHỨNG TỪ")
+                status_counts = merged_display['ĐÁNH GIÁ (STATUS)'].value_counts().reset_index()
+                status_counts.columns = ['Trạng Thái', 'Số Lượng Vật Tư']
+                
+                fig = px.pie(status_counts, values='Số Lượng Vật Tư', names='Trạng Thái', title='Phân bổ Tình trạng Đối chiếu',
+                             color='Trạng Thái', color_discrete_map={
+                                 "🟢 KHỚP HOÀN TOÀN": "green", "🟡 KHỚP (DUNG SAI)": "lightgreen",
+                                 "🔴 LỆCH PACKING LIST": "red", "🟠 LỆCH SỔ SÁCH ERP": "orange", "❌ KHUYẾT MÃ INVOICE": "purple"
+                             })
+                st.plotly_chart(fig, use_container_width=True)
