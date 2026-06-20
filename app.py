@@ -39,7 +39,7 @@ def check_password():
     if not st.session_state["auth"]:
         col1, col2, col3 = st.columns([1,2,1])
         with col2:
-            st.markdown("<h2 style='text-align: center; color: #1E3A8A; padding-top: 50px;'>🌐 Chingluh Group - SCM EXIM VN - IMPORT TEAM 🌐</h2>", unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align: center; color: #1E3A8A; padding-top: 50px;'>🌐 CLG SCM EXIM VN - IMPORT TEAM 🌐</h2>", unsafe_allow_html=True)
             st.markdown("<p style='text-align: center;'>Hệ thống liên thông dữ liệu Ching Luh & Fu-Luh khi kiểm tra E54 & E23 </p>", unsafe_allow_html=True)
             pwd = st.text_input("Nhập mã truy cập an ninh:", type="password")
             if pwd:
