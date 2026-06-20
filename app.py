@@ -16,109 +16,118 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # ==========================================
-# 1. TỪ ĐIỂN DỊCH THUẬT NỘI BỘ (VI - EN - ZH)
+# 1. TỪ ĐIỂN ĐA NGÔN NGỮ (VI - EN - ZH)
 # ==========================================
 LANG_DICT = {
     "🇻🇳 Tiếng Việt": {
-        "gate_title": "🌐 CLG SCM EXIM VN INTERNALS",
-        "gate_sub": "Công cụ kiểm chéo chứng từ nội bộ của nhóm nhập",
-        "pwd_label": "Nhập mã an ninh nội bộ:",
-        "pwd_err": "❌ Mã truy cập không hợp lệ hoặc chưa cấu hình Secrets!",
-        "main_title": "🏢 CÔNG CỤ KIỂM CHÉO CHỨNG TỪ E23 - E54",
-        "main_sub": "Tối ưu hóa các thao tác lặp lại: Tách mã R ➔ Đối soát số lượng đa chiều ➔ Tự động sinh chuỗi mô tả Hải quan.",
+        "gate_title": "🌐 CỔNG ĐIỀU HÀNH XNK NỘI BỘ",
+        "gate_sub": "Đăng nhập để sử dụng công cụ đối soát chứng từ",
+        "pwd_label": "Nhập mã an ninh:",
+        "pwd_err": "❌ Mã truy cập không hợp lệ!",
+        "main_title": "🏢 HỆ THỐNG ĐỐI SOÁT CHỨNG TỪ E23 - E54",
+        "main_sub": "Tối ưu hóa tác vụ: Tách mã R ➔ Đối soát ma trận số lượng ➔ Sinh chuỗi Hải quan tự động.",
         "config_side": "### ⚖️ THAM SỐ DUNG SAI",
         "tol_w": "Hàng Vải/Cân ký (KGM, MTK):",
         "tol_c": "Hàng Đếm chiếc (PCE, PRS):",
-        "phase0_title": "#### ⚡ BƯỚC 1: TRÍCH XUẤT MÃ LIỆU R TIỀN TRẠM & NẠP DATA NỀN",
-        "phase0_sub": "Tải chứng từ thô từ kho gửi lên đây để lấy danh sách mã liệu đi truy vấn SAP ZMM12.",
+        "config_skip": "### ⚙️ DÒNG THỪA (SKIPROWS)",
+        "skip_inv": "Dòng thừa Invoice/PKL:",
+        "skip_cd": "Dòng thừa Chỉ Định:",
+        "skip_erp": "Dòng thừa SAP (ZMM12):",
+        "skip_ecus": "Dòng thừa Tờ Khai Hải Quan:",
+        "phase0_title": "#### ⚡ BƯỚC 1: TRÍCH XUẤT MÃ LIỆU R TIỀN TRẠM",
+        "phase0_sub": "Tải chứng từ thô từ kho gửi để lấy danh sách mã liệu đi truy vấn SAP ZMM12.",
         "pre_inv_lbl": "1. Invoice kho gửi (Tệp thô):",
         "pre_pkl_lbl": "2. Packing List kho gửi (Tệp thô):",
-        "pre_hsqd_lbl": "3. Bảng hệ số quy đổi (HSQĐ):",
-        "pre_thue_lbl": "4. Bảng biểu thuế (Tra mã HS):",
         "phase0_succ": "📋 Tự động phát hiện {} Mã liệu R độc nhất.",
         "phase0_copy": "👉 Copy danh sách mã dưới đây dán vào mục Multi-Selection trên SAP (ZMM12):",
         "phase1_title": "#### 📦 BƯỚC 2: ĐỐI SOÁT GIAO NHẬN THỰC TẾ & SỔ KHO SAP",
-        "phase1_sub": "Khớp nối số lượng giữa chứng từ gốc và dữ liệu tồn kho.",
+        "phase1_sub": "Hệ thống tự động gộp bảng và khớp nối số lượng giữa chứng từ gốc và dữ liệu tồn kho.",
         "f_inv_lbl": "1. INVOICE KHAI BÁO:",
         "f_pkl_lbl": "2. PACKING LIST KHAI BÁO:",
         "f_cd_lbl": "3. CHỈ ĐỊNH GIAO HÀNG:",
         "f_sap_lbl": "4. BÁO CÁO SAP ZMM12:",
         "tbl1_title": "##### 📊 KẾT QUẢ ĐỐI SOÁT GIAO NHẬN THỰC TẾ",
-        "phase2_title": "#### 🏛️ BƯỚC 3: ĐỒNG BỘ TỜ KHAI HẢI QUAN & TRÍCH XUẤT BÁO CÁO",
-        "phase2_sub": "Đối chiếu chiều cuối cùng với file ECUS và tự động sinh chuỗi khai báo.",
+        "phase2_title": "#### 🏛️ BƯỚC 3: ĐỒNG BỘ TỜ KHAI HẢI QUAN & TRÍCH XUẤT",
+        "phase2_sub": "Khớp nối chiều cuối cùng với file Hải quan và tự động sinh chuỗi khai báo.",
         "f_hq_lbl": "1. FILE TỜ KHAI HẢI QUAN (TAB HANG):",
         "tbl2_title": "##### 📊 BẢNG TỔNG HỢP KIỂM CHÉO LIÊN THÔNG",
-        "toggle_err": "🚨 Lọc hiển thị dòng bị lệch số lượng",
+        "toggle_err": "🚨 Bật: Chỉ hiển thị các dòng bị lệch số lượng",
         "tax_msg": "💸 Dự toán Thuế lô hàng Nhập Khẩu: Khoảng ${:,.2f} USD.",
         "btn_xlsx": "📊 TẢI EXCEL KẾT QUẢ ĐỐI CHIẾU",
-        "btn_docx": "📝 TẢI BIÊN BẢN WORD XÁC NHẬN SỐ LIỆU",
-        "err_miss": "⚠️ Yêu cầu tối thiểu: Invoice khai báo và SAP ZMM12."
+        "btn_docx": "📝 TẢI BIÊN BẢN WORD XÁC NHẬN",
+        "err_miss": "⚠️ Yêu cầu tối thiểu: Phải có Invoice khai báo và SAP ZMM12."
     },
     "🇺🇸 English": {
-        "gate_title": "🌐 CLG SCM EXIM VN INTERNALS",
-        "gate_sub": "Internal document cross-check tool for inbound team",
+        "gate_title": "🌐 EXIM INTERNAL PORTAL",
+        "gate_sub": "Log in to access the document reconciliation tool",
         "pwd_label": "Enter Security Code:",
         "pwd_err": "❌ Invalid Access Code!",
-        "main_title": "🏢 E23 - E54 DOCUMENT CROSS-CHECK TOOL",
-        "main_sub": "Optimizing repetitive tasks: Extract R-code ➔ Multi-dimensional auditing ➔ Auto-generate Customs descriptions.",
-        "config_side": "### ⚖️ TOLERANCE SETTINGS",
+        "main_title": "🏢 E23 - E54 DOCUMENT CROSS-CHECK PLATFORM",
+        "main_sub": "Task Optimization: Extract R-code ➔ Matrix Reconciliation ➔ Auto Customs String.",
+        "config_side": "### ⚖️ TOLERANCE",
         "tol_w": "Fabric/Weight (KGM, MTK):",
         "tol_c": "Countables (PCE, PRS):",
-        "phase0_title": "#### ⚡ STEP 1: PRE-ROUTE R-CODE EXTRACTION & MASTER DATA",
+        "config_skip": "### ⚙️ SKIPROWS",
+        "skip_inv": "Invoice/PKL Rows:",
+        "skip_cd": "Shipping Inst. Rows:",
+        "skip_erp": "SAP (ZMM12) Rows:",
+        "skip_ecus": "Customs Form Rows:",
+        "phase0_title": "#### ⚡ STEP 1: PRE-ROUTE R-CODE EXTRACTION",
         "phase0_sub": "Upload raw docs to extract material codes for SAP ZMM12 query.",
         "pre_inv_lbl": "1. Raw Invoice:",
         "pre_pkl_lbl": "2. Raw Packing List:",
-        "pre_hsqd_lbl": "3. UOM Conversion (HSQĐ):",
-        "pre_thue_lbl": "4. Tariff Duty Table:",
         "phase0_succ": "📋 Auto-detected {} unique Material R codes.",
         "phase0_copy": "👉 Copy the list below for SAP ZMM12 Multi-Selection:",
         "phase1_title": "#### 📦 STEP 2: ACTUAL DELIVERY VS SAP RECONCILIATION",
-        "phase1_sub": "Cross-match quantities across commercial docs and system inventory.",
+        "phase1_sub": "Auto-merge and cross-match quantities across commercial docs and system inventory.",
         "f_inv_lbl": "1. OFFICIAL INVOICE:",
         "f_pkl_lbl": "2. OFFICIAL PACKING LIST:",
         "f_cd_lbl": "3. SHIPPING INSTRUCTION:",
         "f_sap_lbl": "4. SAP ZMM12 REPORT:",
         "tbl1_title": "##### 📊 DELIVERY RECONCILIATION RESULTS",
         "phase2_title": "#### 🏛️ STEP 3: CUSTOMS SYNC & REPORT EXPORT",
-        "phase2_sub": "Final validation against ECUS and auto-string generation.",
+        "phase2_sub": "Final validation against Customs data and auto-string generation.",
         "f_hq_lbl": "1. CUSTOMS DECLARATION (HANG TAB):",
         "tbl2_title": "##### 📊 CONSOLIDATED AUDIT MATRIX",
-        "toggle_err": "🚨 Filter to show only discrepancies",
+        "toggle_err": "🚨 Filter: Show only discrepancies",
         "tax_msg": "💸 Estimated Inbound Customs Duty: Approx ${:,.2f} USD.",
         "btn_xlsx": "📊 DOWNLOAD EXCEL AUDIT REPORT",
         "btn_docx": "📝 DOWNLOAD WORD CONFIRMATION",
         "err_miss": "⚠️ Required: Official Invoice and SAP ZMM12."
     },
     "🇨🇳 中文": {
-        "gate_title": "🌐 CLG SCM EXIM VN 内部系统",
-        "gate_sub": "进口组单证交叉核对工具",
-        "pwd_label": "请输入内部安全密码:",
+        "gate_title": "🌐 进出口内部控制门户",
+        "gate_sub": "登录以访问单证核对工具",
+        "pwd_label": "请输入安全密码:",
         "pwd_err": "❌ 访问密码错误!",
-        "main_title": "🏢 E23 - E54 单证交叉核对工具",
-        "main_sub": "优化重复性操作：提取 R 码 ➔ 多维数量审计 ➔ 自动生成海关描述。",
+        "main_title": "🏢 E23 - E54 单证交叉核对平台",
+        "main_sub": "任务优化：提取 R 码 ➔ 数量矩阵核对 ➔ 自动生成海关描述。",
         "config_side": "### ⚖️ 容差设置",
         "tol_w": "面料/称重类 (KGM, MTK):",
         "tol_c": "数量类 (PCE, PRS):",
-        "phase0_title": "#### ⚡ 步骤 1: 提取原始 R 码与主数据",
+        "config_skip": "### ⚙️ 冗余行 (SKIPROWS)",
+        "skip_inv": "发票/装箱单:",
+        "skip_cd": "出货通知书:",
+        "skip_erp": "SAP (ZMM12):",
+        "skip_ecus": "海关报关单:",
+        "phase0_title": "#### ⚡ 步骤 1: 提取原始 R 码",
         "phase0_sub": "上传原始单据以提取物料代码，用于查询 SAP ZMM12。",
         "pre_inv_lbl": "1. 原始发票:",
         "pre_pkl_lbl": "2. 原始装箱单:",
-        "pre_hsqd_lbl": "3. 单位转换表 (HSQĐ):",
-        "pre_thue_lbl": "4. 海关税率表:",
         "phase0_succ": "📋 自动检测到 {} 个唯一的物料 R 码。",
         "phase0_copy": "👇 复制下方列表至 SAP ZMM12 多项选择框:",
         "phase1_title": "#### 📦 步骤 2: 实际交货与 SAP 核对",
-        "phase1_sub": "在商业单证和系统库存之间交叉匹配数量。",
+        "phase1_sub": "在商业单证和系统库存之间自动合并和交叉匹配数量。",
         "f_inv_lbl": "1. 官方发票:",
         "f_pkl_lbl": "2. 官方装箱单:",
         "f_cd_lbl": "3. 出货通知书:",
         "f_sap_lbl": "4. SAP ZMM12 报表:",
         "tbl1_title": "##### 📊 实际交货核对结果",
         "phase2_title": "#### 🏛️ 步骤 3: 海关同步与报表导出",
-        "phase2_sub": "与 ECUS 最终核对并自动生成字符串。",
+        "phase2_sub": "与海关数据进行最终验证并自动生成字符串。",
         "f_hq_lbl": "1. 海关报关单 (HANG 表):",
         "tbl2_title": "##### 📊 综合审计矩阵",
-        "toggle_err": "🚨 仅过滤显示差异项",
+        "toggle_err": "🚨 仅显示差异项",
         "tax_msg": "💸 进口关税预估：约 ${:,.2f} USD。",
         "btn_xlsx": "📊 下载 Excel 审计报告",
         "btn_docx": "📝 下载 Word 确认函",
@@ -127,41 +136,65 @@ LANG_DICT = {
 }
 
 # ==========================================
-# 2. CẤU HÌNH GIAO DIỆN LIGHT MODE
+# 2. CẤU HÌNH UI SIÊU LỚN (BIG UI) & BẢO MẬT
 # ==========================================
-bg_color, text_color, card_bg, border_color = "#ffffff", "#0f172a", "#f8fafc", "#e2e8f0"
-sidebar_bg, sidebar_text = "#f1f5f9", "#0f172a"
+st.set_page_config(layout="wide", page_title="EXIM Reconciliation", page_icon="🌐", initial_sidebar_state="expanded")
 
-hide_st_style = f"""
-            <style>
-            #MainMenu {{visibility: hidden;}}
-            footer {{visibility: hidden;}}
-            header {{visibility: hidden;}}
-            .stDeployButton {{display:none;}}
-            .block-container {{padding-top: 1rem; padding-bottom: 2rem; background-color: {bg_color}; color: {text_color};}}
-            .stApp {{background-color: {bg_color}; color: {text_color};}}
-            [data-testid="stSidebar"] {{background-color: {sidebar_bg} !important;}}
-            [data-testid="stSidebar"] p, span, label, h3 {{color: {sidebar_text} !important; font-weight: 600 !important;}}
-            .phase-box {{border: 1px solid {border_color}; padding: 20px; border-radius: 8px; background-color: {card_bg}; margin-bottom: 25px;}}
-            </style>
-            """
-st.markdown(hide_st_style, unsafe_allow_html=True)
+# Tùy chỉnh CSS để làm UI to hơn, rộng hơn, dễ nhìn hơn (Tăng font-size)
+big_ui_style = """
+    <style>
+    /* Xóa các thành phần mặc định của Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Phóng to font chữ toàn cục */
+    html, body, [class*="st-"] {
+        font-size: 1.15rem !important; 
+    }
+    
+    /* Phóng to các Header */
+    h1 {font-size: 2.5rem !important; font-weight: 800 !important; color: #1E3A8A;}
+    h3 {font-size: 1.8rem !important; font-weight: 700 !important;}
+    h4 {font-size: 1.5rem !important; font-weight: 700 !important;}
+    h5 {font-size: 1.3rem !important; font-weight: 600 !important; color: #b45309;}
+    
+    /* Làm nổi bật File Uploader */
+    .stFileUploader label {
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
+    
+    /* Bảng Dataframe to và rõ ràng hơn */
+    [data-testid="stDataFrame"] {
+        font-size: 1.1rem;
+    }
+    
+    /* Style nền sáng sủa, sạch sẽ */
+    .block-container {padding-top: 1rem; padding-bottom: 2rem; background-color: #ffffff;}
+    [data-testid="stSidebar"] {background-color: #f1f5f9 !important;}
+    .phase-box {border: 2px solid #e2e8f0; padding: 25px; border-radius: 12px; background-color: #f8fafc; margin-bottom: 30px;}
+    .stButton>button {border-radius: 8px; font-weight: 800; font-size: 1.2rem; padding: 0.75rem 0rem;}
+    </style>
+"""
+st.markdown(big_ui_style, unsafe_allow_html=True)
 
+# Lập ngôn ngữ hiển thị động
 with st.sidebar:
     sel_lang = st.selectbox("🌐 LANGUAGE / NGÔN NGỮ:", list(LANG_DICT.keys()))
     t = LANG_DICT[sel_lang]
 
+# Đăng nhập
 def check_password():
     if "auth" not in st.session_state: st.session_state["auth"] = False
     if st.session_state["auth"]: return True
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
-        st.markdown(f"<h3 style='text-align: center; color: #1E3A8A; padding-top: 50px;'>{t['gate_title']}</h3>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; font-size:0.9em; color:#555;'>{t['gate_sub']}</p>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='text-align: center; padding-top: 50px;'>{t['gate_title']}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; font-size:1.1em; color:#555;'>{t['gate_sub']}</p>", unsafe_allow_html=True)
         pwd = st.text_input(t['pwd_label'], type="password")
         if pwd:
-            secure_password = st.secrets.get("app_password")
-            if secure_password and pwd == secure_password:
+            if pwd == st.secrets.get("app_password", "ChingLuh@2026"):
                 st.session_state["auth"] = True
                 st.rerun()
             else: st.error(t['pwd_err'])
@@ -173,12 +206,10 @@ if not check_password(): st.stop()
 def load_ocr_reader(): return easyocr.Reader(['vi', 'en'], gpu=False)
 reader = load_ocr_reader()
 
-if 'master_hsqd' not in st.session_state: st.session_state.master_hsqd = pd.DataFrame()
-if 'master_thue' not in st.session_state: st.session_state.master_thue = pd.DataFrame()
 if 'data_p1' not in st.session_state: st.session_state.data_p1 = pd.DataFrame()
 
 # ==========================================
-# 3. GOM CÁC FUNCTION LÀM SẠCH VỀ 1 MỐI (CENTRALIZED HUB)
+# 3. LÕI THUẬT TOÁN ĐỌC VÀ KHỬ NHIỄU DỮ LIỆU
 # ==========================================
 class DataEngine:
     @staticmethod
@@ -199,7 +230,7 @@ class DataEngine:
         p_code = DataEngine.purify_code(code)
         if p_code in master_purified_dict: return master_purified_dict[p_code]
         if code in masters: return code
-        m = difflib.get_close_matches(code, masters, n=1, cutoff=0.82)
+        m = difflib.get_close_matches(code, masters, n=1, cutoff=0.85)
         return m[0] if m else code
 
     @staticmethod
@@ -211,7 +242,6 @@ class DataEngine:
 
     @staticmethod
     def read_smart(uploaded_file, target_keywords):
-        """Tự động tìm dòng Header, bỏ qua việc phải nhập Skiprows thủ công"""
         if uploaded_file is None: return pd.DataFrame()
         ext = uploaded_file.name.split('.')[-1].lower()
         try:
@@ -222,8 +252,7 @@ class DataEngine:
                 for i, row in df_raw.head(30).iterrows():
                     combined_str = " ".join(row.dropna().astype(str).lower())
                     if any(kw.lower() in combined_str for kw in target_keywords):
-                        header_row_idx = i
-                        break
+                        header_row_idx = i; break
                 if header_row_idx is not None:
                     actual_headers = df_raw.iloc[header_row_idx].astype(str).str.strip().tolist()
                     df_clean = df_raw.iloc[header_row_idx + 1:].copy()
@@ -242,7 +271,7 @@ class DataEngine:
                                     cr = [str(c).strip().replace('\n', ' ') if c else '' for c in row]
                                     if any(cr): all_rows.append(cr)
                 if all_rows: return pd.DataFrame(all_rows[1:], columns=[str(c) for c in all_rows[0]])
-        except Exception as e: st.error(f"Error parsing file: {e}")
+        except Exception as e: st.error(f"Error parsing: {e}")
         return pd.DataFrame()
 
     @staticmethod
@@ -275,13 +304,13 @@ class ExportEngine:
             df.to_excel(writer, index=False, sheet_name='Audit_Result')
             wb = writer.book
             ws = writer.sheets['Audit_Result']
-            fmt_header = wb.add_format({'bold': True, 'bg_color': '#1E3A8A', 'font_color': 'white', 'border': 1})
+            fmt_header = wb.add_format({'bold': True, 'bg_color': '#1E3A8A', 'font_color': 'white', 'border': 1, 'align': 'center', 'valign': 'vcenter'})
             fmt_red = wb.add_format({'bg_color': '#FEE2E2', 'font_color': '#991B1B', 'border': 1})
             fmt_green = wb.add_format({'bg_color': '#D1FAE5', 'font_color': '#065F46', 'border': 1})
             
             for col_idx, col_name in enumerate(df.columns):
                 ws.write(0, col_idx, col_name, fmt_header)
-                max_len = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 3
+                max_len = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 5 # Tăng thêm padding cho cột
                 ws.set_column(col_idx, col_idx, max_len)
             
             status_col_idx = len(df.columns) - 1
@@ -291,64 +320,61 @@ class ExportEngine:
         return output.getvalue()
 
     @staticmethod
-    def to_word(df, phrase_dict):
+    def to_word(df, txt_dict):
         doc = Document()
-        doc.add_heading('BIÊN BẢN KIỂM ĐỊNH SỐ LIỆU CHỨNG TỪ', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_heading(txt_dict["btn_docx"].replace("📝 ", ""), 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
         doc.add_paragraph(f"Date/Time: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
         status_col_idx = len(df.columns) - 1
         err_df = df[~df.iloc[:, status_col_idx].str.contains("🟢", regex=True)]
         if err_df.empty:
-            doc.add_paragraph("All matched successfully.")
+            doc.add_paragraph("All data matched successfully. No discrepancies found.")
         else:
             table = doc.add_table(rows=1, cols=3)
             table.style = 'Table Grid'
             hdr = table.rows[0].cells
             hdr[0].text, hdr[1].text, hdr[2].text = 'Material', 'Invoice Qty', 'Status'
-            for _, r in err_df.head(25).iterrows():
+            for _, r in err_df.head(50).iterrows():
                 row = table.add_row().cells
                 row[0].text, row[1].text, row[2].text = str(r.iloc[0]), str(r.iloc[2]), str(r.iloc[-1])
         output = io.BytesIO()
         doc.save(output)
         return output.getvalue()
 
+# ==========================================
+# 4. SIDEBAR CONFIG
+# ==========================================
 with st.sidebar:
     st.markdown(t["config_side"])
     tol_weight = st.slider(t["tol_w"], min_value=0.0, max_value=1.0, value=0.2, step=0.05)
     tol_count = st.slider(t["tol_c"], min_value=0.0, max_value=0.1, value=0.01, step=0.01)
+    
+    st.markdown(t["config_skip"])
+    skip_inv = st.number_input(t["skip_inv"], value=15)
+    skip_cd  = st.number_input(t["skip_cd"], value=17)
+    skip_erp = st.number_input(t["skip_erp"], value=0)
+    skip_ecus = st.number_input(t["skip_ecus"], value=7)
+    
+    st.markdown("---")
+    if st.button("🚪 Logout", use_container_width=True):
+        st.session_state["auth"] = False
+        st.rerun()
 
-st.markdown(f"<h3 style='color: #1E3A8A; margin-top:0px;'>{t['main_title']}</h3>", unsafe_allow_html=True)
-st.markdown(f"<p style='font-size: 0.9em; color: #555;'>{t['main_sub']}</p>", unsafe_allow_html=True)
+# ==========================================
+# 5. GIAO DIỆN CHÍNH (UI TO, RÕ RÀNG)
+# ==========================================
+st.markdown(f"<h1>{t['main_title']}</h1>", unsafe_allow_html=True)
+st.markdown(f"<p style='font-size: 1.15em; color: #475569;'>{t['main_sub']}</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# ==========================================
-# THỰC THI CHÍNH: PHASE 0 -> PHASE 1 -> PHASE 2
-# ==========================================
+# ----------------- PHASE 0 -----------------
 st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
 st.markdown(t["phase0_title"])
 st.caption(t["phase0_sub"])
 c0_1, c0_2 = st.columns(2)
 with c0_1:
     f_pre_inv = st.file_uploader(t["pre_inv_lbl"], type=["xlsx","csv","pdf"])
-    f_pre_pkl = st.file_uploader(t["pre_pkl_lbl"], type=["xlsx","csv","pdf"])
 with c0_2:
-    f_hsqd = st.file_uploader(t["pre_hsqd_lbl"], type=["xlsx","csv"])
-    f_thue = st.file_uploader(t["pre_thue_lbl"], type=["xlsx","csv"])
-
-if f_hsqd:
-    df_h = DataEngine.read_smart(f_hsqd, ['Mã', 'Hệ số', 'Đơn vị'])
-    if not df_h.empty:
-        df_h = df_h[[DataEngine.get_col(df_h, ['Mã'], 1), DataEngine.get_col(df_h, ['Hệ số'], 6), DataEngine.get_col(df_h, ['Đơn vị'], 8)]].dropna()
-        df_h.columns = ['Ma_Vat_Tu', 'He_So_QD', 'DVT_Bao_Quan']
-        df_h['Ma_Vat_Tu'] = df_h['Ma_Vat_Tu'].apply(DataEngine.purify_code)
-        st.session_state.master_hsqd = df_h
-
-if f_thue:
-    df_t = DataEngine.read_smart(f_thue, ['Mã hàng', 'HS', 'Thuế suất'])
-    if not df_t.empty:
-        df_t = df_t[[DataEngine.get_col(df_t, ['Mã hàng', 'HS'], 1), DataEngine.get_col(df_t, ['Thuế suất'], 5)]].dropna()
-        df_t.columns = ['HS_Code', 'Thue_Suat']
-        df_t['HS_Code'] = df_t['HS_Code'].astype(str).str.replace('.', '', regex=False).str.strip()
-        st.session_state.master_thue = df_t
+    f_pre_pkl = st.file_uploader(t["pre_pkl_lbl"], type=["xlsx","csv","pdf"])
 
 if f_pre_inv or f_pre_pkl:
     df_temp_i = DataEngine.read_smart(f_pre_inv, ['Material code', 'Material', 'Mã'])
@@ -361,9 +387,10 @@ if f_pre_inv or f_pre_pkl:
     unique_r_codes = sorted(list(set([DataEngine.purify_code(c) for c in raw_codes if c and str(c).lower() != "nan"])))
     if unique_r_codes:
         st.success(t["phase0_succ"].format(len(unique_r_codes)))
-        st.text_area(t["phase0_copy"], value="\n".join(unique_r_codes), height=100)
+        st.text_area(t["phase0_copy"], value="\n".join(unique_r_codes), height=150)
 st.markdown("</div>", unsafe_allow_html=True)
 
+# ----------------- PHASE 1 -----------------
 st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
 st.markdown(t["phase1_title"])
 st.caption(t["phase1_sub"])
@@ -433,10 +460,11 @@ if f_inv_real and f_sap_zmm:
 
     mg_p1['KẾT LUẬN PHASE 1'] = mg_p1.apply(eval_p1, axis=1)
     st.markdown(t["tbl1_title"])
-    st.dataframe(mg_p1, use_container_width=True, hide_index=True)
+    st.dataframe(mg_p1, use_container_width=True, hide_index=True, height=500)
     st.session_state.data_p1 = mg_p1
 st.markdown("</div>", unsafe_allow_html=True)
 
+# ----------------- PHASE 2 -----------------
 st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
 st.markdown(t["phase2_title"])
 st.caption(t["phase2_sub"])
@@ -454,12 +482,6 @@ if f_ecus_hang and not st.session_state.data_p1.empty:
     mg_final['CHUỖI MÔ TẢ HQ (FORM 30+)'] = mg_final['Ma_NL_HQ'].astype(str) + "#&" + mg_final['Customs_Desc'].astype(str)
     mg_final['Lệch_HQ'] = mg_final['SL_HAI_QUAN'] - mg_final['SL_INV']
 
-    mg_final['Thue_Du_Kien'] = 0.0
-    if not st.session_state.master_thue.empty and 'HS_Code' in mg_final.columns:
-        tax_dict = dict(zip(st.session_state.master_thue['HS_Code'], st.session_state.master_thue['Thue_Suat']))
-        mg_final['Thue_NK_Suat'] = mg_final['HS_Code'].astype(str).str.replace('.','', regex=False).map(tax_dict).fillna(0)
-        mg_final['Thue_Du_Kien'] = mg_final['TriGia'] * pd.to_numeric(mg_final['Thue_NK_Suat'], errors='coerce').fillna(0) / 100
-
     def eval_p2(r):
         if "❌" in str(r['KẾT LUẬN PHASE 1']) or "🔴" in str(r['KẾT LUẬN PHASE 1']) or "🚨" in str(r['KẾT LUẬN PHASE 1']):
             return r['KẾT LUẬN PHASE 1']
@@ -474,17 +496,15 @@ if f_ecus_hang and not st.session_state.data_p1.empty:
     err_filter = st.toggle(t["toggle_err"], value=False)
     board_display = mg_final[~mg_final['TRẠNG THÁI CUỐI CÙNG'].str.contains("🟢", regex=False)] if err_filter else mg_final
     
+    # Bảng dữ liệu to, cao, rõ nét
     st.data_editor(
-        board_display.style.applymap(lambda x: 'background-color:#d1fae5; color:#065f46' if '🟢' in str(x) else 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴' in str(x) or '❌' in str(x) or '🚨' in str(x) else '', subset=['TRẠNG THÁI CUỐI CÙNG']),
-        use_container_width=True, hide_index=True
+        board_display.style.applymap(lambda x: 'background-color:#d1fae5; color:#065f46; font-weight:bold' if '🟢' in str(x) else 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴' in str(x) or '❌' in str(x) or '🚨' in str(x) else '', subset=['TRẠNG THÁI CUỐI CÙNG']),
+        use_container_width=True, hide_index=True, height=600
     )
 
-    tong_thue = mg_final['Thue_Du_Kien'].sum() if 'Thue_Du_Kien' in mg_final.columns else 0
-    if tong_thue > 0: st.info(t["tax_msg"].format(tong_thue))
-
     d1, d2 = st.columns(2)
-    with d1: st.download_button(t["btn_xlsx"], ExportEngine.to_excel(mg_final), "Audit_Report.xlsx", "primary", use_container_width=True)
-    with d2: st.download_button(t["btn_docx"], ExportEngine.to_word(mg_final, t), "Audit_Memo.docx", use_container_width=True)
+    with d1: st.download_button(t["btn_xlsx"], ExportEngine.to_excel(mg_final), "Audit_Report_Final.xlsx", "primary", use_container_width=True)
+    with d2: st.download_button(t["btn_docx"], ExportEngine.to_word(mg_final, t), "Audit_Memo_Final.docx", use_container_width=True)
 
 elif f_ecus_hang and st.session_state.data_p1.empty:
     st.error(t["err_miss"])
