@@ -9,7 +9,5 @@ openpyxl
 pdfplumber
 python-docx
 easyocr
-fpdf2
 Pillow
 plotly
-scipy
