@@ -37,7 +37,7 @@ def check_password():
             st.markdown("<p style='text-align: center;'>Hệ thống liên thông dữ liệu Ching Luh & Fu-Luh khi khai báo E54 E23</p>", unsafe_allow_html=True)
             pwd = st.text_input("Nhập mã truy cập an ninh:", type="password")
             if pwd:
-                if pwd == st.secrets.get("app_password", "ChingLuh@2026"):
+                if pwd == st.secrets.get("app_password"):
                     st.session_state["auth"] = True
                     st.rerun()
                 else: st.error("❌ Mã truy cập không hợp lệ!")
