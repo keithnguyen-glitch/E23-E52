@@ -21,7 +21,7 @@ warnings.filterwarnings('ignore')
 # ==========================================
 # 1. CẤU HÌNH GIAO DIỆN & BẢO MẬT (WHITE-LABEL)
 # ==========================================
-st.set_page_config(layout="wide", page_title="CLG SCM EXIM VN E54-E23", page_icon="🌐", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="Hệ Sinh Thái XNK E54-E23", page_icon="🌐", initial_sidebar_state="expanded")
 
 hide_st_style = """
             <style>
@@ -29,17 +29,16 @@ hide_st_style = """
             footer {visibility: hidden;}
             header {visibility: hidden;}
             .stDeployButton {display:none;}
-            .block-container {padding-top: 1rem; padding-bottom: 2rem; max-width: 98%;}
+            .block-container {padding-top: 1rem; padding-bottom: 2rem;}
             /* Custom Sidebar */
             [data-testid="stSidebar"] {background-color: #f8fafc;}
-            /* Thêm CSS cho các thẻ đồ họa nâng cao */
+            
+            /* Giữ lại CSS cho các Dashboard Card cho đẹp */
             .metric-card {background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid #2563eb; margin-bottom: 15px;}
             .metric-card.alert {border-left-color: #ef4444;}
             .metric-card.success {border-left-color: #10b981;}
             .metric-title {font-size: 13px; color: #64748b; font-weight: 700; text-transform: uppercase;}
             .metric-value {font-size: 28px; color: #0f172a; font-weight: 900;}
-            .stButton>button {border-radius: 8px; font-weight: 700; padding: 0.5rem 1rem; transition: all 0.3s ease;}
-            .stButton>button:hover {transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);}
             </style>
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
@@ -63,9 +62,7 @@ def check_password():
 if not check_password(): st.stop()
 
 @st.cache_resource
-def load_ocr_reader(): 
-    return easyocr.Reader(['vi', 'en'], gpu=False)
-
+def load_ocr_reader(): return easyocr.Reader(['vi', 'en'], gpu=False)
 reader = load_ocr_reader()
 
 # =====================================================================
@@ -226,7 +223,7 @@ class ValidationEngine:
         return "🔴 LỆCH KHAI BÁO E23"
 
 # =====================================================================
-# 5. EXPORT ENGINE (BỘ TRÍCH XUẤT BÁO CÁO CỰC MẠNH)
+# 5. EXPORT ENGINE (BỘ TRÍCH XUẤT ĐA ĐỊNH DẠNG)
 # =====================================================================
 class ExportEngine:
     @staticmethod
@@ -385,7 +382,7 @@ def view_dashboard():
     c2.markdown(f"<div class='metric-card'><div class='metric-title'>Tổng Trị Giá (USD)</div><div class='metric-value'>${tdf['TriGia'].sum():,.2f}</div></div>", unsafe_allow_html=True)
     
     errs = len(tdf[~tdf['TRẠNG THÁI XUẤT'].str.contains('🟢')])
-    err_rate = (errs / len(tdf)) * 100
+    err_rate = (errs / len(tdf)) * 100 if len(tdf) > 0 else 0
     color_class = "success" if err_rate < 5 else "alert"
     c3.markdown(f"<div class='metric-card {color_class}'><div class='metric-title'>Vật Tư Sai Lệch</div><div class='metric-value'>{errs} ({err_rate:.1f}%)</div></div>", unsafe_allow_html=True)
     c4.markdown(f"<div class='metric-card'><div class='metric-title'>Ngày Tạo Lô Hàng</div><div class='metric-value'>{st.session_state.inv_date.strftime('%d/%m/%Y')}</div></div>", unsafe_allow_html=True)
@@ -438,11 +435,11 @@ def view_master_data():
                 st.success("✅ Lưu Biểu Thuế thành công!")
         if not st.session_state.master_thue.empty: st.dataframe(st.session_state.master_thue.head(3), use_container_width=True)
 
-def view_chingluh_e54():
+def view_chingluh_export():
     st.markdown("## 📤 PHÂN HỆ CHING LUH (XUẤT HÀNG E54)")
     st.session_state.inv_date = st.date_input("🗓️ Ngày lập Invoice Xuất:", st.session_state.inv_date)
     
-    with st.expander("⚙️ Tùy chỉnh dòng tiêu đề thừa (Skiprows)"):
+    with st.expander("⚙️ Cấu hình Header dòng trống (Skiprows)"):
         c_sk1, c_sk2, c_sk3 = st.columns(3)
         with c_sk1: sk_i = st.number_input("Invoice/PKL:", value=15)
         with c_sk2: sk_e = st.number_input("ERP Kho:", value=0)
@@ -475,7 +472,6 @@ def view_chingluh_e54():
             df_inv['Ma_Vat_Tu'] = df_inv['Ma_Vat_Tu'].apply(DataCleaner.norm_code)
             for c in ['SL_INV', 'DonGia', 'TriGia']: df_inv[c] = pd.to_numeric(df_inv[c].astype(str).str.replace(',',''), errors='coerce').fillna(0)
             
-            # Anomaly Detection
             df_inv = AnomalyDetector.detect_price_outliers(df_inv, 'DonGia')
             df_inv = LogisticsEngine.convert_hsqd(df_inv, 'SL_INV', 'UOM_INV')
             df_inv['UOM_INV'] = df_inv['UOM_INV'].apply(DataCleaner.norm_uom)
@@ -596,11 +592,11 @@ def view_fuluh_e23():
             st.markdown("### 📥 TRÍCH XUẤT KẾT QUẢ QUYẾT TOÁN TỔNG HỢP (E23/E54)")
             cx1, cx2, cx3 = st.columns(3)
             with cx1:
-                st.download_button("📊 TẢI EXCEL (TÔ MÀU)", ExportEngine.to_excel(mg, "Quyet_Toan_E23"), "Final_Audit_E54_E23.xlsx", "primary", use_container_width=True)
+                st.download_button("📊 TẢI EXCEL (TÔ MÀU & TÁCH SHEET LỖI)", ExportEngine.to_excel(mg, "Quyet_Toan_E23"), "Final_Audit_E54_E23.xlsx", "primary", use_container_width=True)
             with cx2:
                 st.download_button("📑 TẢI PDF (BÁO CÁO CÔNG SỞ)", ExportEngine.to_pdf(mg, "BIEN BAN QUYET TOAN CHUOI CUNG UNG", "So lieu tich hop E54-E23.", total_tax), "Final_Audit_E54_E23.pdf", use_container_width=True)
             with cx3:
-                st.download_button("📝 TẢI WORD (TRÌNH KÝ)", ExportEngine.to_word(mg, st.session_state.inv_date.strftime('%d/%m/%Y')), "Agreement_E54_E23.docx", use_container_width=True)
+                st.download_button("📝 TẢI WORD (TRÌNH KÝ GIÁM ĐỐC)", ExportEngine.to_word(mg, st.session_state.inv_date.strftime('%d/%m/%Y')), "Agreement_E54_E23.docx", use_container_width=True)
 
 # =====================================================================
 # 8. APP ROUTER
