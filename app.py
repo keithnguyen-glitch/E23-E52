@@ -238,7 +238,7 @@ class DataEngine:
         for c in df.columns:
             for kw in kws:
                 if kw.lower() in str(c).lower(): return c
-        return df.columns[fb_idx] if len(df.columns) > fb_idx else None
+        return df.columns[fb_idx] if (fb_idx is not None and len(df.columns) > fb_idx) else None
 
     @staticmethod
     def read_smart(uploaded_file, target_keywords):
