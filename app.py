@@ -206,6 +206,9 @@ class DataEngine:
     @staticmethod
     def clean_numeric(series):
         if series is None: return 0
+        # VÁ LỖI TRÙNG TÊN CỘT: Ép lấy cột đầu tiên nếu Pandas trả về DataFrame
+        if isinstance(series, pd.DataFrame):
+            series = series.iloc[:, 0]
         cleaned = series.astype(str).str.replace(',', '', regex=False)
         cleaned = cleaned.str.replace(r'[^\d\.]', '', regex=True)
         return pd.to_numeric(cleaned, errors='coerce').fillna(0)
@@ -235,20 +238,36 @@ class DataEngine:
     def read_smart(uploaded_file, target_keywords):
         if uploaded_file is None: return pd.DataFrame()
         ext = uploaded_file.name.split('.')[-1].lower()
+        
+        # Hàm khử trùng lặp tên cột (VD: Quantity, Quantity_1)
+        def deduplicate_cols(cols):
+            seen = {}
+            res = []
+            for c in cols:
+                c_str = str(c).strip()
+                if c_str in seen:
+                    seen[c_str] += 1
+                    res.append(f"{c_str}_{seen[c_str]}")
+                else:
+                    seen[c_str] = 0
+                    res.append(c_str)
+            return res
+
         try:
             if ext in ['xlsx', 'xls', 'csv']:
                 df_raw = pd.read_csv(uploaded_file, skiprows=0, on_bad_lines='skip') if ext == 'csv' else pd.read_excel(uploaded_file, skiprows=0)
-                df_raw.columns = [str(c).strip() for c in df_raw.columns]
+                df_raw.columns = deduplicate_cols(df_raw.columns)
+                
                 header_row_idx = None
                 for i, row in df_raw.head(30).iterrows():
-                    # VÁ LỖI 1: Bóc từng chữ ra biến thành str rồi mới lower, không gọi lower() trực tiếp lên Series
                     combined_str = " ".join([str(val).lower() for val in row.dropna()])
                     if any(kw.lower() in combined_str for kw in target_keywords):
                         header_row_idx = i; break
+                        
                 if header_row_idx is not None:
-                    actual_headers = df_raw.iloc[header_row_idx].astype(str).str.strip().tolist()
+                    actual_headers = df_raw.iloc[header_row_idx].tolist()
                     df_clean = df_raw.iloc[header_row_idx + 1:].copy()
-                    df_clean.columns = actual_headers
+                    df_clean.columns = deduplicate_cols(actual_headers)
                     df_clean = df_clean.loc[:, ~df_clean.columns.str.contains('^nan|^Unnamed', case=False)].dropna(how='all')
                     return df_clean
                 return df_raw.dropna(how='all')
@@ -267,7 +286,8 @@ class DataEngine:
                             text = page.extract_text()
                             if text:
                                 for line in text.split('\n'): all_rows.append([line])
-                if all_rows: return pd.DataFrame(all_rows[1:], columns=[str(c) for c in all_rows[0]])
+                if all_rows: 
+                    return pd.DataFrame(all_rows[1:], columns=deduplicate_cols(all_rows[0]))
             
             elif ext in ['png', 'jpg', 'jpeg']:
                 img = Image.open(uploaded_file).convert('RGB')
@@ -425,7 +445,6 @@ if f_inv_real and f_sap_zmm:
     p_mat = DataEngine.get_col(r_pkl, ['Material', 'Mã'], 0)
     p_qty = DataEngine.get_col(r_pkl, ["Q'TY", 'Quantity'], 5)
     df_pkl = pd.DataFrame()
-    # VÁ LỖI 2: Thêm .str.upper() thay vì .upper() để chạy mượt cho cột dữ liệu Series
     df_pkl['Ma_Vat_Tu'] = r_pkl[p_mat].astype(str).str.strip().str.upper().apply(lambda x: DataEngine.fz_match(x, masters, master_purified_dict))
     df_pkl['SL_PKL'] = DataEngine.clean_numeric(r_pkl[p_qty])
     df_pkl = df_pkl.groupby('Ma_Vat_Tu', as_index=False)['SL_PKL'].sum()
@@ -435,7 +454,6 @@ if f_inv_real and f_sap_zmm:
         cd_mat = DataEngine.get_col(r_cd, ['Mã NL', 'Material'], 1)
         cd_qty = DataEngine.get_col(r_cd, ['Số Lượng', 'Quantity'], 4)
         df_cd = pd.DataFrame()
-        # VÁ LỖI 2: Thêm .str.upper() thay vì .upper()
         df_cd['Ma_Vat_Tu'] = r_cd[cd_mat].astype(str).str.strip().str.upper().apply(lambda x: DataEngine.fz_match(x, masters, master_purified_dict))
         df_cd['SL_ChiDinh'] = DataEngine.clean_numeric(r_cd[cd_qty])
         df_cd = df_cd.groupby('Ma_Vat_Tu', as_index=False)['SL_ChiDinh'].sum()
