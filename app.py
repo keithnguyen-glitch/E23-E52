@@ -12,7 +12,7 @@ import plotly.express as px
 # ==========================================
 # 1. CẤU HÌNH GIAO DIỆN & BẢO MẬT
 # ==========================================
-st.set_page_config(layout="wide", page_title="XNK Ultimate AI Checker", page_icon="💎", initial_sidebar_state="expanded")
+st.set_page_config(layout="wide", page_title="CLG SCM EXIM VN E23 E54 checker", page_icon="💎", initial_sidebar_state="expanded")
 
 def check_password():
     if "password_correct" not in st.session_state: st.session_state["password_correct"] = False
