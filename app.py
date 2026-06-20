@@ -140,37 +140,30 @@ LANG_DICT = {
 # ==========================================
 st.set_page_config(layout="wide", page_title="EXIM Reconciliation", page_icon="🌐", initial_sidebar_state="expanded")
 
-# Tùy chỉnh CSS để làm UI to hơn, rộng hơn, dễ nhìn hơn (Tăng font-size)
 big_ui_style = """
     <style>
-    /* Xóa các thành phần mặc định của Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Phóng to font chữ toàn cục */
     html, body, [class*="st-"] {
         font-size: 1.15rem !important; 
     }
     
-    /* Phóng to các Header */
     h1 {font-size: 2.5rem !important; font-weight: 800 !important; color: #1E3A8A;}
     h3 {font-size: 1.8rem !important; font-weight: 700 !important;}
     h4 {font-size: 1.5rem !important; font-weight: 700 !important;}
     h5 {font-size: 1.3rem !important; font-weight: 600 !important; color: #b45309;}
     
-    /* Làm nổi bật File Uploader */
     .stFileUploader label {
         font-weight: 700 !important;
         color: #0f172a !important;
     }
     
-    /* Bảng Dataframe to và rõ ràng hơn */
     [data-testid="stDataFrame"] {
         font-size: 1.1rem;
     }
     
-    /* Style nền sáng sủa, sạch sẽ */
     .block-container {padding-top: 1rem; padding-bottom: 2rem; background-color: #ffffff;}
     [data-testid="stSidebar"] {background-color: #f1f5f9 !important;}
     .phase-box {border: 2px solid #e2e8f0; padding: 25px; border-radius: 12px; background-color: #f8fafc; margin-bottom: 30px;}
@@ -179,12 +172,10 @@ big_ui_style = """
 """
 st.markdown(big_ui_style, unsafe_allow_html=True)
 
-# Lập ngôn ngữ hiển thị động
 with st.sidebar:
     sel_lang = st.selectbox("🌐 LANGUAGE / NGÔN NGỮ:", list(LANG_DICT.keys()))
     t = LANG_DICT[sel_lang]
 
-# Đăng nhập
 def check_password():
     if "auth" not in st.session_state: st.session_state["auth"] = False
     if st.session_state["auth"]: return True
@@ -260,6 +251,7 @@ class DataEngine:
                     df_clean = df_clean.loc[:, ~df_clean.columns.str.contains('^nan|^Unnamed', case=False)].dropna(how='all')
                     return df_clean
                 return df_raw.dropna(how='all')
+            
             elif ext == 'pdf':
                 all_rows = []
                 with pdfplumber.open(io.BytesIO(uploaded_file.read())) as pdf:
@@ -270,7 +262,18 @@ class DataEngine:
                                 for row in table:
                                     cr = [str(c).strip().replace('\n', ' ') if c else '' for c in row]
                                     if any(cr): all_rows.append(cr)
+                        else:
+                            text = page.extract_text()
+                            if text:
+                                for line in text.split('\n'): all_rows.append([line])
                 if all_rows: return pd.DataFrame(all_rows[1:], columns=[str(c) for c in all_rows[0]])
+            
+            elif ext in ['png', 'jpg', 'jpeg']:
+                img = Image.open(uploaded_file).convert('RGB')
+                img.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+                ocr_results = reader.readtext(np.array(img), detail=0)
+                return pd.DataFrame(ocr_results, columns=["Du_Lieu_OCR"])
+
         except Exception as e: st.error(f"Error parsing: {e}")
         return pd.DataFrame()
 
@@ -310,7 +313,7 @@ class ExportEngine:
             
             for col_idx, col_name in enumerate(df.columns):
                 ws.write(0, col_idx, col_name, fmt_header)
-                max_len = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 5 # Tăng thêm padding cho cột
+                max_len = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 5
                 ws.set_column(col_idx, col_idx, max_len)
             
             status_col_idx = len(df.columns) - 1
@@ -372,9 +375,9 @@ st.markdown(t["phase0_title"])
 st.caption(t["phase0_sub"])
 c0_1, c0_2 = st.columns(2)
 with c0_1:
-    f_pre_inv = st.file_uploader(t["pre_inv_lbl"], type=["xlsx","csv","pdf"])
+    f_pre_inv = st.file_uploader(t["pre_inv_lbl"], type=["xlsx","csv","pdf","jpg","png","jpeg"])
 with c0_2:
-    f_pre_pkl = st.file_uploader(t["pre_pkl_lbl"], type=["xlsx","csv","pdf"])
+    f_pre_pkl = st.file_uploader(t["pre_pkl_lbl"], type=["xlsx","csv","pdf","jpg","png","jpeg"])
 
 if f_pre_inv or f_pre_pkl:
     df_temp_i = DataEngine.read_smart(f_pre_inv, ['Material code', 'Material', 'Mã'])
@@ -396,10 +399,10 @@ st.markdown(t["phase1_title"])
 st.caption(t["phase1_sub"])
 c1_1, c1_2 = st.columns(2)
 with c1_1:
-    f_inv_real = st.file_uploader(t["f_inv_lbl"], type=["xlsx","csv"])
-    f_pkl_real = st.file_uploader(t["f_pkl_lbl"], type=["xlsx","csv"])
+    f_inv_real = st.file_uploader(t["f_inv_lbl"], type=["xlsx","csv","pdf","jpg","png","jpeg"])
+    f_pkl_real = st.file_uploader(t["f_pkl_lbl"], type=["xlsx","csv","pdf","jpg","png","jpeg"])
 with c1_2:
-    f_cd_real = st.file_uploader(t["f_cd_lbl"], type=["xlsx","csv"])
+    f_cd_real = st.file_uploader(t["f_cd_lbl"], type=["xlsx","csv","pdf","jpg","png","jpeg"])
     f_sap_zmm = st.file_uploader(t["f_sap_lbl"], type=["xlsx","csv"])
 
 if f_inv_real and f_sap_zmm:
