@@ -1,0 +1,263 @@
+super_app.py
+import streamlit as st
+import pandas as pd
+import io
+import pdfplumber
+from docx import Document
+import easyocr
+import numpy as np
+from PIL import Image
+from fpdf import FPDF
+
+# ==========================================
+# PHA 0: CẤU HÌNH & BẢO MẬT
+# ==========================================
+st.set_page_config(layout="wide", page_title="Hệ Thống Đối Chiếu E54", page_icon="🛡️")
+
+def check_password():
+    """Hệ thống Cổng Bảo Vệ Nội Bộ"""
+    if "password_correct" not in st.session_state:
+        st.session_state["password_correct"] = False
+
+    if not st.session_state["password_correct"]:
+        st.markdown("### 🔒 HỆ THỐNG KIỂM SOÁT DỮ LIỆU XNK NỘI BỘ")
+        pwd = st.text_input("Vui lòng nhập mật khẩu cấp phép:", type="password")
+        if pwd:
+            if pwd == st.secrets["app_password"]:
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.error("❌ Mật khẩu không chính xác. Truy cập bị từ chối.")
+        return False
+    return True
+
+if not check_password():
+    st.stop()
+
+# Load mô hình OCR (Cache để chạy nhanh, dùng CPU)
+@st.cache_resource
+def load_ocr_reader():
+    return easyocr.Reader(['vi', 'en'], gpu=False)
+
+reader = load_ocr_reader()
+
+# ==========================================
+# PHA 1: TRÍCH XUẤT ĐA ĐỊNH DẠNG TỐI ƯU
+# ==========================================
+def extract_and_clean_data(uploaded_file, skiprows_count=0):
+    """Đọc đa định dạng và tự động làm sạch bước đầu"""
+    if uploaded_file is None:
+        return None
+    
+    ext = uploaded_file.name.split('.')[-1].lower()
+    df = pd.DataFrame()
+    
+    try:
+        # Xử lý Excel / CSV
+        if ext in ['xlsx', 'xls', 'csv']:
+            if ext == 'csv':
+                df = pd.read_csv(uploaded_file, skiprows=skiprows_count, on_bad_lines='skip')
+            else:
+                df = pd.read_excel(uploaded_file, skiprows=skiprows_count)
+            # Dọn rác
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            df = df.dropna(how='all')
+            
+        # Xử lý PDF (Đọc Bảng thông minh)
+        elif ext == 'pdf':
+            all_rows = []
+            with pdfplumber.open(io.BytesIO(uploaded_file.read())) as pdf:
+                for page in pdf.pages:
+                    tables = page.extract_tables()
+                    for table in tables:
+                        for row in table:
+                            # Lọc các dòng None hoặc rỗng
+                            clean_row = [str(cell).replace('\n', ' ') if cell else '' for cell in row]
+                            if any(clean_row): 
+                                all_rows.append(clean_row)
+            if all_rows:
+                df = pd.DataFrame(all_rows[1:], columns=all_rows[0])
+
+        # Xử lý Ảnh bằng AI OCR (Tối ưu RAM)
+        elif ext in ['png', 'jpg', 'jpeg']:
+            image = Image.open(uploaded_file)
+            # Nén ảnh để tránh sập RAM Cloud (Tối đa 1600px)
+            image.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+            ocr_result = reader.readtext(np.array(image), detail=0)
+            df = pd.DataFrame(ocr_result, columns=["Dữ_Liệu_Đọc_Được"])
+
+        # Chuẩn hóa tên cột
+        df.columns = [str(c).strip() for c in df.columns]
+        return df
+    except Exception as e:
+        st.error(f"❌ Lỗi khi đọc file {uploaded_file.name}: {e}")
+        return None
+
+# ==========================================
+# GIAO DIỆN CHÍNH
+# ==========================================
+st.title("🛡️ TRUNG TÂM KIỂM ĐỊNH CHỨNG TỪ E54")
+st.markdown("Hệ thống tự động đối chiếu: Invoice, Packing List, Chỉ Định Giao Hàng & Hệ Thống SAP/ERP")
+
+col1, col2 = st.columns(2)
+with col1:
+    st.subheader("📋 1. Dữ Liệu Chứng Từ (Hải Quan)")
+    file_inv = st.file_uploader("📥 INVOICE (Excel/CSV/PDF)", type=["xlsx", "csv", "pdf", "jpg"])
+    file_pkl = st.file_uploader("📥 PACKING LIST (Excel/CSV/PDF)", type=["xlsx", "csv", "pdf"])
+    file_cd  = st.file_uploader("📥 CHỈ ĐỊNH GIAO HÀNG (Excel/CSV)", type=["xlsx", "csv", "pdf"])
+
+with col2:
+    st.subheader("💻 2. Dữ Liệu Sổ Sách (ERP)")
+    file_erp = st.file_uploader("📥 BÁO CÁO KHO SAP/ERP (Excel/CSV)", type=["xlsx", "csv"])
+    
+    st.markdown("---")
+    st.markdown("⚙️ **Cấu hình loại bỏ dòng thừa (Header)**")
+    skip_inv = st.number_input("Số dòng thừa của Invoice:", value=16, min_value=0)
+    skip_pkl = st.number_input("Số dòng thừa của Packing List:", value=16, min_value=0)
+    skip_cd  = st.number_input("Số dòng thừa của Chỉ định:", value=18, min_value=0)
+
+if st.button("🚀 KÍCH HOẠT ĐỐI CHIẾU TOÀN DIỆN", type="primary", use_container_width=True):
+    if not (file_inv and file_pkl and file_cd and file_erp):
+        st.warning("⚠️ Vui lòng tải lên ĐẦY ĐỦ 4 tệp dữ liệu để chạy đối chiếu chéo!")
+    else:
+        with st.spinner("🔄 Hệ thống đang chạy AI và thuật toán đối chiếu..."):
+            
+            # --- PHA 2: TRÍCH XUẤT VÀ DOUBLE CHECK DỮ LIỆU THÔ ---
+            raw_inv = extract_and_clean_data(file_inv, skip_inv)
+            raw_pkl = extract_and_clean_data(file_pkl, skip_pkl)
+            raw_cd  = extract_and_clean_data(file_cd, skip_cd)
+            raw_erp = extract_and_clean_data(file_erp, 0)
+            
+            st.markdown("---")
+            st.subheader("🔎 TRẠM DOUBLE CHECK 1: KIỂM TRA DỮ LIỆU ĐỌC VÀO")
+            st.caption("Mở rộng các bảng dưới đây để đảm bảo AI đọc đúng tên cột và không bị lệch dòng trước khi đối chiếu.")
+            
+            check_col1, check_col2, check_col3, check_col4 = st.columns(4)
+            with check_col1:
+                with st.expander("Preview Invoice"): st.dataframe(raw_inv.head(5) if raw_inv is not None else "Lỗi")
+            with check_col2:
+                with st.expander("Preview Packing List"): st.dataframe(raw_pkl.head(5) if raw_pkl is not None else "Lỗi")
+            with check_col3:
+                with st.expander("Preview Chỉ Định"): st.dataframe(raw_cd.head(5) if raw_cd is not None else "Lỗi")
+            with check_col4:
+                with st.expander("Preview ERP"): st.dataframe(raw_erp.head(5) if raw_erp is not None else "Lỗi")
+
+            # --- PHA 3: CHUẨN HÓA & GOM NHÓM DỮ LIỆU ---
+            try:
+                def clean_material_code(s):
+                    return str(s).strip().upper()
+                
+                # 1. Xử lý Invoice
+                inv_mat_col = 'Material code' if 'Material code' in raw_inv.columns else raw_inv.columns[1]
+                inv_qty_col = 'Quantity Customs' if 'Quantity Customs' in raw_inv.columns else raw_inv.columns[3]
+                df_inv = raw_inv[[inv_mat_col, inv_qty_col]].dropna()
+                df_inv.columns = ['Ma_Vat_Tu', 'SL_Invoice']
+                df_inv['Ma_Vat_Tu'] = df_inv['Ma_Vat_Tu'].apply(clean_material_code)
+                df_inv['SL_Invoice'] = pd.to_numeric(df_inv['SL_Invoice'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+
+                # 2. Xử lý Packing List (ĐẶC BIỆT: Phải Groupby để cộng dồn nếu 1 mã đóng nhiều kiện)
+                pkl_mat_col = 'Material' if 'Material' in raw_pkl.columns else raw_pkl.columns[1]
+                pkl_qty_col = "Q'TY" if "Q'TY" in raw_pkl.columns else raw_pkl.columns[5]
+                df_pkl = raw_pkl[[pkl_mat_col, pkl_qty_col]].dropna()
+                df_pkl.columns = ['Ma_Vat_Tu', 'SL_PKL']
+                df_pkl['Ma_Vat_Tu'] = df_pkl['Ma_Vat_Tu'].apply(clean_material_code)
+                df_pkl['SL_PKL'] = pd.to_numeric(df_pkl['SL_PKL'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                df_pkl = df_pkl.groupby('Ma_Vat_Tu', as_index=False)['SL_PKL'].sum()
+
+                # 3. Xử lý Chỉ định giao hàng
+                cd_mat_col = 'Mã NL' if 'Mã NL' in raw_cd.columns else raw_cd.columns[1]
+                cd_qty_col = 'Số Lượng' if 'Số Lượng' in raw_cd.columns else raw_cd.columns[3]
+                df_cd = raw_cd[[cd_mat_col, cd_qty_col]].dropna()
+                df_cd.columns = ['Ma_Vat_Tu', 'SL_ChiDinh']
+                df_cd['Ma_Vat_Tu'] = df_cd['Ma_Vat_Tu'].apply(clean_material_code)
+                df_cd['SL_ChiDinh'] = pd.to_numeric(df_cd['SL_ChiDinh'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+                df_cd = df_cd.groupby('Ma_Vat_Tu', as_index=False)['SL_ChiDinh'].sum()
+
+                # 4. Xử lý ERP
+                erp_mat_col = raw_erp.columns[0]
+                erp_qty_col = raw_erp.columns[1]
+                df_erp = raw_erp[[erp_mat_col, erp_qty_col]].dropna()
+                df_erp.columns = ['Ma_Vat_Tu', 'SL_ERP']
+                df_erp['Ma_Vat_Tu'] = df_erp['Ma_Vat_Tu'].apply(clean_material_code)
+                df_erp['SL_ERP'] = pd.to_numeric(df_erp['SL_ERP'].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+
+                # --- PHA 4: FULL OUTER JOIN & ĐÁNH GIÁ (TRẠM DOUBLE CHECK 2) ---
+                merged = pd.merge(df_inv, df_pkl, on='Ma_Vat_Tu', how='outer')
+                merged = pd.merge(merged, df_cd, on='Ma_Vat_Tu', how='outer')
+                merged = pd.merge(merged, df_erp, on='Ma_Vat_Tu', how='outer').fillna(0)
+
+                # Tính độ lệch
+                merged['Lech_PKL'] = merged['SL_Invoice'] - merged['SL_PKL']
+                merged['Lech_ChiDinh'] = merged['SL_Invoice'] - merged['SL_ChiDinh']
+                merged['Lech_ERP'] = merged['SL_Invoice'] - merged['SL_ERP']
+
+                # Hàm đánh giá logic nghiệp vụ
+                def evaluate_row(row):
+                    if row['SL_Invoice'] == 0 or row['SL_ERP'] == 0:
+                        return "❌ LỖI: KHUYẾT MÃ / THIẾU DỮ LIỆU"
+                    if row['Lech_PKL'] == 0 and row['Lech_ChiDinh'] == 0 and row['Lech_ERP'] == 0:
+                        return "🟢 KHỚP TUYỆT ĐỐI"
+                    if row['Lech_PKL'] != 0 or row['Lech_ChiDinh'] != 0:
+                        return "🔴 LỆCH CHỨNG TỪ (Cần sửa File)"
+                    return "🟠 LỆCH ERP (Cần ktra Sổ sách)"
+
+                merged['TRẠNG THÁI (HITL)'] = merged.apply(evaluate_row, axis=1)
+
+                st.markdown("---")
+                st.subheader("🎯 BẢNG KẾT QUẢ ĐỐI CHIẾU CHÍNH THỨC")
+                
+                # Giao diện hiển thị màu sắc
+                def color_format(val):
+                    if val == "🟢 KHỚP TUYỆT ĐỐI": return 'background-color: #c6efce; color: #006100; font-weight:bold'
+                    if val == "🔴 LỆCH CHỨNG TỪ (Cần sửa File)": return 'background-color: #ffc7ce; color: #9c0006; font-weight:bold'
+                    if val == "🟠 LỆCH ERP (Cần ktra Sổ sách)": return 'background-color: #ffe6cc; color: #b35c00; font-weight:bold'
+                    if val == "❌ LỖI: KHUYẾT MÃ / THIẾU DỮ LIỆU": return 'background-color: #f8d7da; color: #721c24; font-weight:bold'
+                    return ''
+
+                # Sắp xếp các dòng Lỗi lên đầu để dễ nhìn
+                merged = merged.sort_values(by='TRẠNG THÁI (HITL)', ascending=False)
+                st.dataframe(merged.style.map(color_format, subset=['TRẠNG THÁI (HITL)']), use_container_width=True, height=400)
+
+                # Thống kê nhanh
+                err_count = len(merged[merged['TRẠNG THÁI (HITL)'] != "🟢 KHỚP TUYỆT ĐỐI"])
+                if err_count == 0:
+                    st.success("🎉 CHÚC MỪNG: Lô hàng 100% khớp số liệu. Sẵn sàng thông quan!")
+                else:
+                    st.error(f"⚠️ CẢNH BÁO: Phát hiện {err_count} dòng vật tư bị lệch. Vui lòng kiểm tra lại báo cáo!")
+
+                # --- PHA 5: XUẤT REPORT ---
+                st.markdown("### 📥 XUẤT BÁO CÁO")
+                exp1, exp2 = st.columns(2)
+                
+                # Xuất Excel
+                excel_buf = io.BytesIO()
+                with pd.ExcelWriter(excel_buf, engine='xlsxwriter') as writer:
+                    merged.to_excel(writer, index=False, sheet_name='E54_Checked_Data')
+                
+                with exp1:
+                    st.download_button("📊 TẢI FILE EXCEL (NẠP ECUS5)", data=excel_buf.getvalue(), file_name="E54_KetQua_DoiChieu.xlsx", type="primary", use_container_width=True)
+
+                # Xuất PDF Biên bản
+                with exp2:
+                    pdf = FPDF()
+                    pdf.add_page()
+                    pdf.set_font("Arial", size=14, style='B')
+                    pdf.cell(200, 10, txt="BIEN BAN KIEM TRA KHO / CHUNG TU E54", ln=1, align="C")
+                    pdf.set_font("Arial", size=10)
+                    pdf.cell(200, 10, txt=f"So dong bi lech can kiem tra lai: {err_count} ma vat tu", ln=2)
+                    pdf.ln(5)
+                    pdf.cell(60, 8, "Ma Vat Tu", 1); pdf.cell(30, 8, "SL Invoice", 1); pdf.cell(30, 8, "SL ERP", 1); pdf.cell(70, 8, "Trang Thai", 1)
+                    pdf.ln()
+                    # Chỉ in 10 dòng lỗi tiêu biểu
+                    for _, row in merged[merged['TRẠNG THÁI (HITL)'] != "🟢 KHỚP TUYỆT ĐỐI"].head(10).iterrows():
+                        pdf.cell(60, 8, str(row['Ma_Vat_Tu'])[:18], 1)
+                        pdf.cell(30, 8, str(row['SL_Invoice']), 1)
+                        pdf.cell(30, 8, str(row['SL_ERP']), 1)
+                        pdf.cell(70, 8, str(row['TRẠNG THÁI (HITL)'])[:25], 1)
+                        pdf.ln()
+                    
+                    st.download_button("📑 TẢI BIÊN BẢN (PDF)", data=bytes(pdf.output()), file_name="BienBan_E54.pdf", use_container_width=True)
+
+            except Exception as e:
+                st.error(f"❌ Thuật toán gặp lỗi khi xử lý dữ liệu: {e}")
+                st.info("💡 Hướng dẫn Double Check: Mở 'Trạm Double Check 1' ở trên, xem cột chứa mã vật tư và số lượng có khớp tên như yêu cầu hệ thống không.")

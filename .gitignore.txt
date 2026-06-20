@@ -1,0 +1,19 @@
+.gitignore
+venv/
+.venv/
+__pycache__/
+
+# Tuyệt đối không upload dữ liệu cty lên Git
+*.xlsx
+*.xls
+*.csv
+*.pdf
+*.doc
+*.docx
+*.png
+*.jpg
+*.jpeg
+*.msg
+
+# Chặn file chứa mật khẩu
+.streamlit/
