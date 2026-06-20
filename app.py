@@ -20,11 +20,11 @@ warnings.filterwarnings('ignore')
 # ==========================================
 LANG_DICT = {
     "🇻🇳 Tiếng Việt": {
-        "gate_title": "🌐 CỔNG ĐIỀU HÀNH XNK NỘI BỘ",
+        "gate_title": "🌐 CLG SCM EXIM _ IMPORT TEAM E54 & E23",
         "gate_sub": "Đăng nhập để sử dụng công cụ đối soát chứng từ",
         "pwd_label": "Nhập mã an ninh:",
         "pwd_err": "❌ Mã truy cập không hợp lệ!",
-        "main_title": "🏢 HỆ THỐNG ĐỐI SOÁT CHỨNG TỪ E23 - E54",
+        "main_title": "🏢 HỆ THỐNG ĐỐI SOÁT CHỨNG TỪ E54 - E23",
         "main_sub": "Tối ưu hóa tác vụ: Tách mã R ➔ Đối soát ma trận số lượng ➔ Sinh chuỗi Hải quan tự động.",
         "config_side": "### ⚖️ THAM SỐ DUNG SAI",
         "tol_w": "Hàng Vải/Cân ký (KGM, MTK):",
@@ -36,16 +36,16 @@ LANG_DICT = {
         "skip_ecus": "Dòng thừa Tờ Khai Hải Quan:",
         "phase0_title": "#### ⚡ BƯỚC 1: TRÍCH XUẤT MÃ LIỆU R TIỀN TRẠM",
         "phase0_sub": "Tải chứng từ thô từ kho gửi để lấy danh sách mã liệu đi truy vấn SAP ZMM12.",
-        "pre_inv_lbl": "1. Invoice kho gửi (Hỗ trợ Ảnh/PDF/Excel):",
-        "pre_pkl_lbl": "2. Packing List kho gửi (Hỗ trợ Ảnh/PDF/Excel):",
+        "pre_inv_lbl": "1. Invoice kho gửi (Tệp thô):",
+        "pre_pkl_lbl": "2. Packing List kho gửi (Tệp thô):",
         "phase0_succ": "📋 Tự động phát hiện {} Mã liệu R độc nhất.",
         "phase0_copy": "👉 Copy danh sách mã dưới đây dán vào mục Multi-Selection trên SAP (ZMM12):",
         "phase1_title": "#### 📦 BƯỚC 2: ĐỐI SOÁT GIAO NHẬN THỰC TẾ & SỔ KHO SAP",
         "phase1_sub": "Hệ thống tự động gộp bảng và khớp nối số lượng giữa chứng từ gốc và dữ liệu tồn kho.",
-        "f_inv_lbl": "1. INVOICE KHAI BÁO (Ảnh/PDF/Excel):",
-        "f_pkl_lbl": "2. PACKING LIST KHAI BÁO (Ảnh/PDF/Excel):",
-        "f_cd_lbl": "3. CHỈ ĐỊNH GIAO HÀNG (Ảnh/PDF/Excel):",
-        "f_sap_lbl": "4. BÁO CÁO SAP ZMM12 (Excel/CSV):",
+        "f_inv_lbl": "1. INVOICE KHAI BÁO:",
+        "f_pkl_lbl": "2. PACKING LIST KHAI BÁO:",
+        "f_cd_lbl": "3. CHỈ ĐỊNH GIAO HÀNG:",
+        "f_sap_lbl": "4. BÁO CÁO SAP ZMM12:",
         "tbl1_title": "##### 📊 KẾT QUẢ ĐỐI SOÁT GIAO NHẬN THỰC TẾ",
         "phase2_title": "#### 🏛️ BƯỚC 3: ĐỒNG BỘ TỜ KHAI HẢI QUAN & TRÍCH XUẤT",
         "phase2_sub": "Khớp nối chiều cuối cùng với file Hải quan và tự động sinh chuỗi khai báo.",
@@ -74,16 +74,16 @@ LANG_DICT = {
         "skip_ecus": "Customs Form Rows:",
         "phase0_title": "#### ⚡ STEP 1: PRE-ROUTE R-CODE EXTRACTION",
         "phase0_sub": "Upload raw docs to extract material codes for SAP ZMM12 query.",
-        "pre_inv_lbl": "1. Raw Invoice (Img/PDF/Excel):",
-        "pre_pkl_lbl": "2. Raw Packing List (Img/PDF/Excel):",
+        "pre_inv_lbl": "1. Raw Invoice:",
+        "pre_pkl_lbl": "2. Raw Packing List:",
         "phase0_succ": "📋 Auto-detected {} unique Material R codes.",
         "phase0_copy": "👉 Copy the list below for SAP ZMM12 Multi-Selection:",
         "phase1_title": "#### 📦 STEP 2: ACTUAL DELIVERY VS SAP RECONCILIATION",
         "phase1_sub": "Auto-merge and cross-match quantities across commercial docs and system inventory.",
-        "f_inv_lbl": "1. OFFICIAL INVOICE (Img/PDF/Excel):",
-        "f_pkl_lbl": "2. OFFICIAL PACKING LIST (Img/PDF/Excel):",
-        "f_cd_lbl": "3. SHIPPING INSTRUCTION (Img/PDF/Excel):",
-        "f_sap_lbl": "4. SAP ZMM12 REPORT (Excel/CSV):",
+        "f_inv_lbl": "1. OFFICIAL INVOICE:",
+        "f_pkl_lbl": "2. OFFICIAL PACKING LIST:",
+        "f_cd_lbl": "3. SHIPPING INSTRUCTION:",
+        "f_sap_lbl": "4. SAP ZMM12 REPORT:",
         "tbl1_title": "##### 📊 DELIVERY RECONCILIATION RESULTS",
         "phase2_title": "#### 🏛️ STEP 3: CUSTOMS SYNC & REPORT EXPORT",
         "phase2_sub": "Final validation against Customs data and auto-string generation.",
@@ -112,16 +112,16 @@ LANG_DICT = {
         "skip_ecus": "海关报关单:",
         "phase0_title": "#### ⚡ 步骤 1: 提取原始 R 码",
         "phase0_sub": "上传原始单据以提取物料代码，用于查询 SAP ZMM12。",
-        "pre_inv_lbl": "1. 原始发票 (图/PDF/Excel):",
-        "pre_pkl_lbl": "2. 原始装箱单 (图/PDF/Excel):",
+        "pre_inv_lbl": "1. 原始发票:",
+        "pre_pkl_lbl": "2. 原始装箱单:",
         "phase0_succ": "📋 自动检测到 {} 个唯一的物料 R 码。",
         "phase0_copy": "👇 复制下方列表至 SAP ZMM12 多项选择框:",
         "phase1_title": "#### 📦 步骤 2: 实际交货与 SAP 核对",
         "phase1_sub": "在商业单证和系统库存之间自动合并和交叉匹配数量。",
-        "f_inv_lbl": "1. 官方发票 (图/PDF/Excel):",
-        "f_pkl_lbl": "2. 官方装箱单 (图/PDF/Excel):",
-        "f_cd_lbl": "3. 出货通知书 (图/PDF/Excel):",
-        "f_sap_lbl": "4. SAP ZMM12 报表 (Excel/CSV):",
+        "f_inv_lbl": "1. 官方发票:",
+        "f_pkl_lbl": "2. 官方装箱单:",
+        "f_cd_lbl": "3. 出货通知书:",
+        "f_sap_lbl": "4. SAP ZMM12 报表:",
         "tbl1_title": "##### 📊 实际交货核对结果",
         "phase2_title": "#### 🏛️ 步骤 3: 海关同步与报表导出",
         "phase2_sub": "与海关数据进行最终验证并自动生成字符串。",
@@ -136,25 +136,41 @@ LANG_DICT = {
 }
 
 # ==========================================
-# 2. CẤU HÌNH UI (BIG UI) & BẢO MẬT
+# 2. CẤU HÌNH UI SIÊU LỚN (BIG UI) & BẢO MẬT
 # ==========================================
 st.set_page_config(layout="wide", page_title="EXIM Reconciliation", page_icon="🌐", initial_sidebar_state="expanded")
 
+# Tùy chỉnh CSS để làm UI to hơn, rộng hơn, dễ nhìn hơn (Tăng font-size)
 big_ui_style = """
     <style>
+    /* Xóa các thành phần mặc định của Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    html, body, [class*="st-"] { font-size: 1.15rem !important; }
+    /* Phóng to font chữ toàn cục */
+    html, body, [class*="st-"] {
+        font-size: 1.15rem !important; 
+    }
+    
+    /* Phóng to các Header */
     h1 {font-size: 2.5rem !important; font-weight: 800 !important; color: #1E3A8A;}
     h3 {font-size: 1.8rem !important; font-weight: 700 !important;}
     h4 {font-size: 1.5rem !important; font-weight: 700 !important;}
     h5 {font-size: 1.3rem !important; font-weight: 600 !important; color: #b45309;}
     
-    .stFileUploader label { font-weight: 700 !important; color: #0f172a !important; }
-    [data-testid="stDataFrame"] { font-size: 1.1rem; }
+    /* Làm nổi bật File Uploader */
+    .stFileUploader label {
+        font-weight: 700 !important;
+        color: #0f172a !important;
+    }
     
+    /* Bảng Dataframe to và rõ ràng hơn */
+    [data-testid="stDataFrame"] {
+        font-size: 1.1rem;
+    }
+    
+    /* Style nền sáng sủa, sạch sẽ */
     .block-container {padding-top: 1rem; padding-bottom: 2rem; background-color: #ffffff;}
     [data-testid="stSidebar"] {background-color: #f1f5f9 !important;}
     .phase-box {border: 2px solid #e2e8f0; padding: 25px; border-radius: 12px; background-color: #f8fafc; margin-bottom: 30px;}
@@ -163,10 +179,12 @@ big_ui_style = """
 """
 st.markdown(big_ui_style, unsafe_allow_html=True)
 
+# Lập ngôn ngữ hiển thị động
 with st.sidebar:
     sel_lang = st.selectbox("🌐 LANGUAGE / NGÔN NGỮ:", list(LANG_DICT.keys()))
     t = LANG_DICT[sel_lang]
 
+# Đăng nhập
 def check_password():
     if "auth" not in st.session_state: st.session_state["auth"] = False
     if st.session_state["auth"]: return True
@@ -191,7 +209,7 @@ reader = load_ocr_reader()
 if 'data_p1' not in st.session_state: st.session_state.data_p1 = pd.DataFrame()
 
 # ==========================================
-# 3. ĐỘNG CƠ ĐỌC & KHỬ NHIỄU (HỖ TRỢ FULL PDF/ẢNH OCR)
+# 3. LÕI THUẬT TOÁN ĐỌC VÀ KHỬ NHIỄU DỮ LIỆU
 # ==========================================
 class DataEngine:
     @staticmethod
@@ -220,8 +238,7 @@ class DataEngine:
         for c in df.columns:
             for kw in kws:
                 if kw.lower() in str(c).lower(): return c
-        # Nếu data là do OCR đọc ra (chỉ có 1 cột) thì lấy luôn cột 0
-        return df.columns[fb_idx] if len(df.columns) > fb_idx else None
+        return df.columns[fb_idx] if (fb_idx is not None and len(df.columns) > fb_idx) else None
 
     @staticmethod
     def read_smart(uploaded_file, target_keywords):
@@ -243,7 +260,6 @@ class DataEngine:
                     df_clean = df_clean.loc[:, ~df_clean.columns.str.contains('^nan|^Unnamed', case=False)].dropna(how='all')
                     return df_clean
                 return df_raw.dropna(how='all')
-            
             elif ext == 'pdf':
                 all_rows = []
                 with pdfplumber.open(io.BytesIO(uploaded_file.read())) as pdf:
@@ -254,20 +270,7 @@ class DataEngine:
                                 for row in table:
                                     cr = [str(c).strip().replace('\n', ' ') if c else '' for c in row]
                                     if any(cr): all_rows.append(cr)
-                        else:
-                            # Vớt text thô nếu PDF không có bảng (Ví dụ: Invoice scan)
-                            text = page.extract_text()
-                            if text:
-                                for line in text.split('\n'): all_rows.append([line])
                 if all_rows: return pd.DataFrame(all_rows[1:], columns=[str(c) for c in all_rows[0]])
-            
-            # Khôi phục AI OCR cho định dạng ảnh (Scan hóa đơn/PKL)
-            elif ext in ['png', 'jpg', 'jpeg']:
-                img = Image.open(uploaded_file).convert('RGB')
-                img.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
-                ocr_results = reader.readtext(np.array(img), detail=0)
-                return pd.DataFrame(ocr_results, columns=["Du_Lieu_OCR"])
-
         except Exception as e: st.error(f"Error parsing: {e}")
         return pd.DataFrame()
 
@@ -301,13 +304,13 @@ class ExportEngine:
             df.to_excel(writer, index=False, sheet_name='Audit_Result')
             wb = writer.book
             ws = writer.sheets['Audit_Result']
-            fmt_header = wb.add_format({'bold': True, 'bg_color': '#1E3A8A', 'font_color': 'white', 'border': 1})
+            fmt_header = wb.add_format({'bold': True, 'bg_color': '#1E3A8A', 'font_color': 'white', 'border': 1, 'align': 'center', 'valign': 'vcenter'})
             fmt_red = wb.add_format({'bg_color': '#FEE2E2', 'font_color': '#991B1B', 'border': 1})
             fmt_green = wb.add_format({'bg_color': '#D1FAE5', 'font_color': '#065F46', 'border': 1})
             
             for col_idx, col_name in enumerate(df.columns):
                 ws.write(0, col_idx, col_name, fmt_header)
-                max_len = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 3
+                max_len = max(df[col_name].astype(str).map(len).max(), len(col_name)) + 5 # Tăng thêm padding cho cột
                 ws.set_column(col_idx, col_idx, max_len)
             
             status_col_idx = len(df.columns) - 1
@@ -319,62 +322,59 @@ class ExportEngine:
     @staticmethod
     def to_word(df, txt_dict):
         doc = Document()
-        doc.add_heading('BIÊN BẢN KIỂM ĐỊNH SỐ LIỆU CHỨNG TỪ', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
+        doc.add_heading(txt_dict["btn_docx"].replace("📝 ", ""), 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
         doc.add_paragraph(f"Date/Time: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
         status_col_idx = len(df.columns) - 1
         err_df = df[~df.iloc[:, status_col_idx].str.contains("🟢", regex=True)]
         if err_df.empty:
-            doc.add_paragraph("All matched successfully.")
+            doc.add_paragraph("All data matched successfully. No discrepancies found.")
         else:
             table = doc.add_table(rows=1, cols=3)
             table.style = 'Table Grid'
             hdr = table.rows[0].cells
             hdr[0].text, hdr[1].text, hdr[2].text = 'Material', 'Invoice Qty', 'Status'
-            for _, r in err_df.head(25).iterrows():
+            for _, r in err_df.head(50).iterrows():
                 row = table.add_row().cells
                 row[0].text, row[1].text, row[2].text = str(r.iloc[0]), str(r.iloc[2]), str(r.iloc[-1])
         output = io.BytesIO()
         doc.save(output)
         return output.getvalue()
 
+# ==========================================
+# 4. SIDEBAR CONFIG
+# ==========================================
 with st.sidebar:
     st.markdown(t["config_side"])
     tol_weight = st.slider(t["tol_w"], min_value=0.0, max_value=1.0, value=0.2, step=0.05)
     tol_count = st.slider(t["tol_c"], min_value=0.0, max_value=0.1, value=0.01, step=0.01)
+    
+    st.markdown(t["config_skip"])
+    skip_inv = st.number_input(t["skip_inv"], value=15)
+    skip_cd  = st.number_input(t["skip_cd"], value=17)
+    skip_erp = st.number_input(t["skip_erp"], value=0)
+    skip_ecus = st.number_input(t["skip_ecus"], value=7)
+    
+    st.markdown("---")
+    if st.button("🚪 Logout", use_container_width=True):
+        st.session_state["auth"] = False
+        st.rerun()
 
-st.markdown(f"<h1 style='color: #1E3A8A; margin-top:0px;'>{t['main_title']}</h1>", unsafe_allow_html=True)
-st.markdown(f"<p style='font-size: 1.1em; color: #475569;'>{t['main_sub']}</p>", unsafe_allow_html=True)
+# ==========================================
+# 5. GIAO DIỆN CHÍNH (UI TO, RÕ RÀNG)
+# ==========================================
+st.markdown(f"<h1>{t['main_title']}</h1>", unsafe_allow_html=True)
+st.markdown(f"<p style='font-size: 1.15em; color: #475569;'>{t['main_sub']}</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# ==========================================
-# THỰC THI CHÍNH: BƯỚC 1 -> BƯỚC 2 -> BƯỚC 3
-# ==========================================
+# ----------------- PHASE 0 -----------------
 st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
 st.markdown(t["phase0_title"])
 st.caption(t["phase0_sub"])
 c0_1, c0_2 = st.columns(2)
 with c0_1:
-    f_pre_inv = st.file_uploader(t["pre_inv_lbl"], type=["xlsx","csv","pdf","jpg","png"])
-    f_pre_pkl = st.file_uploader(t["pre_pkl_lbl"], type=["xlsx","csv","pdf","jpg","png"])
+    f_pre_inv = st.file_uploader(t["pre_inv_lbl"], type=["xlsx","csv","pdf"])
 with c0_2:
-    f_hsqd = st.file_uploader(t["pre_hsqd_lbl"], type=["xlsx","csv"])
-    f_thue = st.file_uploader(t["pre_thue_lbl"], type=["xlsx","csv"])
-
-if f_hsqd:
-    df_h = DataEngine.read_smart(f_hsqd, ['Mã', 'Hệ số', 'Đơn vị'])
-    if not df_h.empty:
-        df_h = df_h[[DataEngine.get_col(df_h, ['Mã'], 1), DataEngine.get_col(df_h, ['Hệ số'], 6), DataEngine.get_col(df_h, ['Đơn vị'], 8)]].dropna()
-        df_h.columns = ['Ma_Vat_Tu', 'He_So_QD', 'DVT_Bao_Quan']
-        df_h['Ma_Vat_Tu'] = df_h['Ma_Vat_Tu'].apply(DataEngine.purify_code)
-        st.session_state.master_hsqd = df_h
-
-if f_thue:
-    df_t = DataEngine.read_smart(f_thue, ['Mã hàng', 'HS', 'Thuế suất'])
-    if not df_t.empty:
-        df_t = df_t[[DataEngine.get_col(df_t, ['Mã hàng', 'HS'], 1), DataEngine.get_col(df_t, ['Thuế suất'], 5)]].dropna()
-        df_t.columns = ['HS_Code', 'Thue_Suat']
-        df_t['HS_Code'] = df_t['HS_Code'].astype(str).str.replace('.', '', regex=False).str.strip()
-        st.session_state.master_thue = df_t
+    f_pre_pkl = st.file_uploader(t["pre_pkl_lbl"], type=["xlsx","csv","pdf"])
 
 if f_pre_inv or f_pre_pkl:
     df_temp_i = DataEngine.read_smart(f_pre_inv, ['Material code', 'Material', 'Mã'])
@@ -390,15 +390,16 @@ if f_pre_inv or f_pre_pkl:
         st.text_area(t["phase0_copy"], value="\n".join(unique_r_codes), height=150)
 st.markdown("</div>", unsafe_allow_html=True)
 
+# ----------------- PHASE 1 -----------------
 st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
 st.markdown(t["phase1_title"])
 st.caption(t["phase1_sub"])
 c1_1, c1_2 = st.columns(2)
 with c1_1:
-    f_inv_real = st.file_uploader(t["f_inv_lbl"], type=["xlsx","csv","pdf","jpg","png"])
-    f_pkl_real = st.file_uploader(t["f_pkl_lbl"], type=["xlsx","csv","pdf","jpg","png"])
+    f_inv_real = st.file_uploader(t["f_inv_lbl"], type=["xlsx","csv"])
+    f_pkl_real = st.file_uploader(t["f_pkl_lbl"], type=["xlsx","csv"])
 with c1_2:
-    f_cd_real = st.file_uploader(t["f_cd_lbl"], type=["xlsx","csv","pdf","jpg","png"])
+    f_cd_real = st.file_uploader(t["f_cd_lbl"], type=["xlsx","csv"])
     f_sap_zmm = st.file_uploader(t["f_sap_lbl"], type=["xlsx","csv"])
 
 if f_inv_real and f_sap_zmm:
@@ -457,12 +458,13 @@ if f_inv_real and f_sap_zmm:
         if abs(r['Lệch_SAP']) > tol: return "🚨 LỖI LỆCH KHO SAP"
         return "🟢 KHỚP"
 
-    mg_p1['KẾT LUẬN'] = mg_p1.apply(eval_p1, axis=1)
+    mg_p1['KẾT LUẬN PHASE 1'] = mg_p1.apply(eval_p1, axis=1)
     st.markdown(t["tbl1_title"])
     st.dataframe(mg_p1, use_container_width=True, hide_index=True, height=500)
     st.session_state.data_p1 = mg_p1
 st.markdown("</div>", unsafe_allow_html=True)
 
+# ----------------- PHASE 2 -----------------
 st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
 st.markdown(t["phase2_title"])
 st.caption(t["phase2_sub"])
@@ -481,8 +483,8 @@ if f_ecus_hang and not st.session_state.data_p1.empty:
     mg_final['Lệch_HQ'] = mg_final['SL_HAI_QUAN'] - mg_final['SL_INV']
 
     def eval_p2(r):
-        if "❌" in str(r['KẾT LUẬN']) or "🔴" in str(r['KẾT LUẬN']) or "🚨" in str(r['KẾT LUẬN']):
-            return r['KẾT LUẬN']
+        if "❌" in str(r['KẾT LUẬN PHASE 1']) or "🔴" in str(r['KẾT LUẬN PHASE 1']) or "🚨" in str(r['KẾT LUẬN PHASE 1']):
+            return r['KẾT LUẬN PHASE 1']
         tol = tol_weight if r['UOM_INV'] in ['KGM', 'MTK'] else tol_count
         if abs(r['Lệch_HQ']) > tol: return "🔴 LỆCH TỜ KHAI HQ"
         return "🟢 KHỚP HOÀN TOÀN"
@@ -494,6 +496,7 @@ if f_ecus_hang and not st.session_state.data_p1.empty:
     err_filter = st.toggle(t["toggle_err"], value=False)
     board_display = mg_final[~mg_final['TRẠNG THÁI CUỐI CÙNG'].str.contains("🟢", regex=False)] if err_filter else mg_final
     
+    # Bảng dữ liệu to, cao, rõ nét
     st.data_editor(
         board_display.style.applymap(lambda x: 'background-color:#d1fae5; color:#065f46; font-weight:bold' if '🟢' in str(x) else 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴' in str(x) or '❌' in str(x) or '🚨' in str(x) else '', subset=['TRẠNG THÁI CUỐI CÙNG']),
         use_container_width=True, hide_index=True, height=600
