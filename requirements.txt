@@ -3,12 +3,13 @@ torch
 torchvision
 streamlit
 pandas
+numpy
 xlsxwriter
+openpyxl
 pdfplumber
 python-docx
 easyocr
 fpdf2
-openpyxl
 Pillow
-numpy
 plotly
+scipy
