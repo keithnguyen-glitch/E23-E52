@@ -55,7 +55,26 @@ LANG_DICT = {
         "tax_msg": "💸 Dự toán Thuế lô hàng Nhập Khẩu: Khoảng ${:,.2f} USD.",
         "btn_xlsx": "📊 TẢI EXCEL KẾT QUẢ ĐỐI CHIẾU",
         "btn_docx": "📝 TẢI BIÊN BẢN WORD XÁC NHẬN",
-        "err_miss": "⚠️ Yêu cầu tối thiểu: Phải có Invoice khai báo và SAP ZMM12."
+        "err_miss": "⚠️ Yêu cầu tối thiểu: Phải có Invoice khai báo và SAP ZMM12.",
+        
+        "dl_title": "#### 🗂️ NẠP HỒ DỮ LIỆU ĐỐI CHIẾU",
+        "dl_sub": "Kéo thả 6 file thô vào đây. Hỗ trợ mọi định dạng: Excel, CSV, Text, PDF, Ảnh (JPG, PNG)...",
+        "f_hd03_lbl": "3. SỔ HD 03 (HẢI QUAN)",
+        "f_zmm12_lbl": "4. SAP ZMM12 (Nội bộ)",
+        "f_iop01_lbl": "5. SAP IOP01 (Quy đổi)",
+        "f_mb52_lbl": "6. SAP MB52/MB51 (Tồn kho)",
+        "eng_title": "#### 🧠 ENGINE KIỂM TOÁN & TẠO FORM ECUS",
+        "spin_msg": "Đang chạy thuật toán kiểm kho và khấu trừ FIFO...",
+        "succ_msg": "🎉 Cỗ máy đã thực thi xong thuật toán Tiền kiểm và Chẻ dòng ECUS!",
+        "err_filter_lbl": "🚨 Chỉ hiển thị các dòng BỊ LỖI / CẢNH BÁO",
+        "btn_ecus_xlsx": "📥 TẢI FILE EXCEL CHUẨN ECUS",
+        "miss_file_msg": "💡 Vui lòng tải đủ 6 file hệ thống để cỗ máy tiến hành đối soát đa chiều và sinh Form ECUS.",
+        "st_err_mb52": "🔴 LỖI: ÂM KHO MB52 (Tồn: {})",
+        "st_warn_zmm": "🟡 CẢNH BÁO: ZMM12 THẤP HƠN NHU CẦU | ",
+        "st_err_hd03_miss": "🔴 LỖI: KHÔNG TÌM THẤY TRONG SỔ HD 03",
+        "st_ok": "🟢 HỢP LỆ (SẴN SÀNG KHAI)",
+        "st_warn_chk": "CẦN CHECK LẠI SỔ KẾ TOÁN",
+        "st_err_hd03_empty": "🔴 LỖI: SỔ HD 03 ĐÃ HẾT TỒN"
     },
     "🇺🇸 English": {
         "gate_title": "🌐 EXIM INTERNAL PORTAL",
@@ -93,7 +112,26 @@ LANG_DICT = {
         "tax_msg": "💸 Estimated Inbound Customs Duty: Approx ${:,.2f} USD.",
         "btn_xlsx": "📊 DOWNLOAD EXCEL AUDIT REPORT",
         "btn_docx": "📝 DOWNLOAD WORD CONFIRMATION",
-        "err_miss": "⚠️ Required: Official Invoice and SAP ZMM12."
+        "err_miss": "⚠️ Required: Official Invoice and SAP ZMM12.",
+        
+        "dl_title": "#### 🗂️ LOAD RECONCILIATION DATA",
+        "dl_sub": "Drag and drop 6 raw files here. Supports all formats: Excel, CSV, Text, PDF, Image (JPG, PNG)...",
+        "f_hd03_lbl": "3. HD 03 BOOK (CUSTOMS)",
+        "f_zmm12_lbl": "4. SAP ZMM12 (Internal)",
+        "f_iop01_lbl": "5. SAP IOP01 (Conversion)",
+        "f_mb52_lbl": "6. SAP MB52/MB51 (Inventory)",
+        "eng_title": "#### 🧠 AUDIT ENGINE & ECUS FORM GENERATION",
+        "spin_msg": "Running inventory check and FIFO allocation algorithm...",
+        "succ_msg": "🎉 Engine successfully executed Pre-check and ECUS line splitting!",
+        "err_filter_lbl": "🚨 Show only ERROR / WARNING lines",
+        "btn_ecus_xlsx": "📥 DOWNLOAD STANDARD ECUS EXCEL",
+        "miss_file_msg": "💡 Please upload all 6 system files to proceed with multi-dimensional reconciliation and ECUS Form generation.",
+        "st_err_mb52": "🔴 ERROR: NEGATIVE MB52 INV (Stock: {})",
+        "st_warn_zmm": "🟡 WARNING: ZMM12 LOWER THAN DEMAND | ",
+        "st_err_hd03_miss": "🔴 ERROR: NOT FOUND IN HD 03 BOOK",
+        "st_ok": "🟢 VALID (READY TO DECLARE)",
+        "st_warn_chk": "NEED TO RECHECK ACCOUNTING BOOK",
+        "st_err_hd03_empty": "🔴 ERROR: HD 03 BOOK OUT OF STOCK"
     },
     "🇨🇳 中文": {
         "gate_title": "🌐 进出口内部控制门户",
@@ -131,7 +169,26 @@ LANG_DICT = {
         "tax_msg": "💸 进口关税预估：约 ${:,.2f} USD。",
         "btn_xlsx": "📊 下载 Excel 审计报告",
         "btn_docx": "📝 下载 Word 确认函",
-        "err_miss": "⚠️ 必填项：官方发票和 SAP ZMM12。"
+        "err_miss": "⚠️ 必填项：官方发票和 SAP ZMM12。",
+        
+        "dl_title": "#### 🗂️ 加载核对数据",
+        "dl_sub": "将6个原始文件拖放到此处。支持所有格式：Excel、CSV、Text、PDF、图片（JPG、PNG）...",
+        "f_hd03_lbl": "3. HD 03 账册 (海关)",
+        "f_zmm12_lbl": "4. SAP ZMM12 (内部)",
+        "f_iop01_lbl": "5. SAP IOP01 (转换)",
+        "f_mb52_lbl": "6. SAP MB52/MB51 (库存)",
+        "eng_title": "#### 🧠 审计引擎 & 生成 ECUS 表单",
+        "spin_msg": "正在运行库存检查和 FIFO 分配算法...",
+        "succ_msg": "🎉 引擎成功执行预检和 ECUS 行拆分！",
+        "err_filter_lbl": "🚨 仅显示 错误 / 警告 行",
+        "btn_ecus_xlsx": "📥 下载标准 ECUS EXCEL",
+        "miss_file_msg": "💡 请上传所有6个系统文件，以进行多维核对并生成 ECUS 表单。",
+        "st_err_mb52": "🔴 错误: MB52 负库存 (库存: {})",
+        "st_warn_zmm": "🟡 警告: ZMM12 低于需求 | ",
+        "st_err_hd03_miss": "🔴 错误: 在 HD 03 账册中未找到",
+        "st_ok": "🟢 有效 (准备申报)",
+        "st_warn_chk": "需要重新检查会计账册",
+        "st_err_hd03_empty": "🔴 错误: HD 03 账册缺货"
     }
 }
 
@@ -206,7 +263,6 @@ class DataEngine:
     @staticmethod
     def clean_numeric(series):
         if series is None: return 0
-        # VÁ LỖI TRÙNG TÊN CỘT: Ép lấy cột đầu tiên nếu Pandas trả về DataFrame
         if isinstance(series, pd.DataFrame):
             series = series.iloc[:, 0]
         cleaned = series.astype(str).str.replace(',', '', regex=False)
@@ -229,17 +285,21 @@ class DataEngine:
 
     @staticmethod
     def get_col(df, kws, fb_idx=0):
+        # 1. Tìm theo từ khóa
         for c in df.columns:
             for kw in kws:
                 if kw.lower() in str(c).lower(): return c
-        return df.columns[fb_idx] if (fb_idx is not None and len(df.columns) > fb_idx) else None
+        # 2. Nếu không thấy, lấy cột theo index dự phòng (nếu index đó tồn tại)
+        if fb_idx is not None and fb_idx < len(df.columns):
+            return df.columns[fb_idx]
+        # 3. Kẹt quá thì lấy cột đầu tiên, tuyệt đối không trả về None để chống lỗi sập
+        return df.columns[0] if len(df.columns) > 0 else None
 
     @staticmethod
     def read_smart(uploaded_file, target_keywords):
         if uploaded_file is None: return pd.DataFrame()
         ext = uploaded_file.name.split('.')[-1].lower()
         
-        # Hàm khử trùng lặp tên cột (VD: Quantity, Quantity_1)
         def deduplicate_cols(cols):
             seen = {}
             res = []
@@ -254,8 +314,33 @@ class DataEngine:
             return res
 
         try:
-            if ext in ['xlsx', 'xls', 'csv']:
-                df_raw = pd.read_csv(uploaded_file, skiprows=0, on_bad_lines='skip') if ext == 'csv' else pd.read_excel(uploaded_file, skiprows=0)
+            # 1. NHÓM EXCEL & TEXT
+            if ext in ['xlsx', 'xls', 'csv', 'xlsb', 'xlsm', 'txt']:
+                df_raw = None
+                if ext in ['csv', 'txt']:
+                    try:
+                        df_raw = pd.read_csv(uploaded_file, on_bad_lines='skip', encoding='utf-8')
+                    except Exception:
+                        uploaded_file.seek(0)
+                        df_raw = pd.read_excel(uploaded_file)
+                else:
+                    try:
+                        df_raw = pd.read_excel(uploaded_file)
+                    except Exception:
+                        uploaded_file.seek(0)
+                        try:
+                            df_raw = pd.read_excel(uploaded_file, engine='openpyxl')
+                        except:
+                            uploaded_file.seek(0)
+                            try:
+                                df_raw = pd.read_excel(uploaded_file, engine='xlrd')
+                            except:
+                                uploaded_file.seek(0)
+                                df_raw = pd.read_csv(uploaded_file, on_bad_lines='skip')
+                
+                if df_raw is None or df_raw.empty:
+                    return pd.DataFrame()
+                    
                 df_raw.columns = deduplicate_cols(df_raw.columns)
                 
                 header_row_idx = None
@@ -270,15 +355,14 @@ class DataEngine:
                     df_clean.columns = deduplicate_cols(actual_headers)
                     df_clean = df_clean.loc[:, ~df_clean.columns.str.contains('^nan|^Unnamed', case=False)].dropna(how='all')
                     
-                    # --- BƠM THẦN CHÚ FILL DOWN ---
                     for col in df_clean.columns:
                         if any(kw.lower() in str(col).lower() for kw in target_keywords):
                             df_clean[col] = df_clean[col].ffill()
                             break
-                    # -------------------------------
                     return df_clean
                 return df_raw.dropna(how='all')
             
+            # 2. NHÓM PDF
             elif ext == 'pdf':
                 all_rows = []
                 with pdfplumber.open(io.BytesIO(uploaded_file.read())) as pdf:
@@ -296,13 +380,15 @@ class DataEngine:
                 if all_rows: 
                     return pd.DataFrame(all_rows[1:], columns=deduplicate_cols(all_rows[0]))
             
+            # 3. NHÓM HÌNH ẢNH SCAN
             elif ext in ['png', 'jpg', 'jpeg']:
                 img = Image.open(uploaded_file).convert('RGB')
                 img.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
                 ocr_results = reader.readtext(np.array(img), detail=0)
                 return pd.DataFrame(ocr_results, columns=["Du_Lieu_OCR"])
 
-        except Exception as e: st.error(f"Error parsing file: {e}")
+        except Exception as e: 
+            st.error(f"🚨 Cảnh báo: File '{uploaded_file.name}' bị lỗi cấu trúc ngầm. Chi tiết: {e}")
         return pd.DataFrame()
 
     @staticmethod
@@ -391,7 +477,6 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
-# ==========================================
 # 5. GIAO DIỆN CHÍNH (UI TO, RÕ RÀNG)
 # ==========================================
 st.markdown(f"<h1>{t['main_title']}</h1>", unsafe_allow_html=True)
@@ -400,26 +485,28 @@ st.markdown("---")
 
 # ----------------- BƯỚC 1: DATA LAKE (HỨNG 6 FILE CHỨNG TỪ & SAP) -----------------
 st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
-st.markdown("#### 🗂️ NẠP HỒ DỮ LIỆU ĐỐI CHIẾU")
-st.caption("Kéo thả 6 file thô vào đây. Hệ thống sẽ gọt rác, check tồn kho trước, rồi mới chẻ dòng ECUS.")
+st.markdown(t["dl_title"])
+st.caption(t["dl_sub"])
+
+file_types = ["xlsx", "csv", "xls", "xlsb", "xlsm", "txt", "pdf", "jpg", "png", "jpeg"]
 
 c1, c2, c3 = st.columns(3)
-with c1: f_inv = st.file_uploader("1. INVOICE (MC)", type=["xlsx","csv"])
-with c2: f_pkl = st.file_uploader("2. PACKING LIST (MC)", type=["xlsx","csv"])
-with c3: f_hd03 = st.file_uploader("3. SỔ HD 03 (HẢI QUAN)", type=["xlsx","csv"])
+with c1: f_inv = st.file_uploader(t["f_inv_lbl"], type=file_types)
+with c2: f_pkl = st.file_uploader(t["f_pkl_lbl"], type=file_types)
+with c3: f_hd03 = st.file_uploader(t["f_hd03_lbl"], type=file_types)
 
 c4, c5, c6 = st.columns(3)
-with c4: f_zmm12 = st.file_uploader("4. SAP ZMM12 (Nội bộ)", type=["xlsx","csv"])
-with c5: f_iop01 = st.file_uploader("5. SAP IOP01 (Quy đổi)", type=["xlsx","csv"])
-with c6: f_mb52 = st.file_uploader("6. SAP MB52/MB51 (Tồn kho)", type=["xlsx","csv"])
+with c4: f_zmm12 = st.file_uploader(t["f_zmm12_lbl"], type=file_types)
+with c5: f_iop01 = st.file_uploader(t["f_iop01_lbl"], type=file_types)
+with c6: f_mb52 = st.file_uploader(t["f_mb52_lbl"], type=file_types)
 st.markdown("</div>", unsafe_allow_html=True)
 
 # ----------------- BƯỚC 2 & 3: ENGINE TIỀN KIỂM & CHẺ DÒNG FIFO -----------------
 if f_inv and f_pkl and f_hd03 and f_zmm12 and f_iop01 and f_mb52:
     st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
-    st.markdown("#### 🧠 ENGINE KIỂM TOÁN & TẠO FORM ECUS")
+    st.markdown(t["eng_title"])
     
-    with st.spinner("Đang chạy thuật toán kiểm kho và khấu trừ FIFO..."):
+    with st.spinner(t["spin_msg"]):
         # 1. ĐỌC DỮ LIỆU
         r_inv = DataEngine.read_smart(f_inv, ['Material code', 'Material'])
         r_hd03 = DataEngine.read_smart(f_hd03, ['Mã nguyên liệu', 'Material', 'Mã NL'])
@@ -500,7 +587,7 @@ if f_inv and f_pkl and f_hd03 and f_zmm12 and f_iop01 and f_mb52:
                 ecus_output.append({
                     'Mã Vật Tư': ma_r, 'ĐVT HQ': unit, 'Lượng Cần Khai': target_qty_hq,
                     'Số TK Gốc': '---', 'Đơn Giá HQ': 0, 'Trị Giá': 0,
-                    'TRẠNG THÁI': f"🔴 LỖI: ÂM KHO MB52 (Tồn: {ton_mb52})"
+                    'TRẠNG THÁI': t['st_err_mb52'].format(ton_mb52)
                 })
                 continue # Kho âm -> Không cho phép chẻ dòng, chặn luôn!
                 
@@ -508,7 +595,7 @@ if f_inv and f_pkl and f_hd03 and f_zmm12 and f_iop01 and f_mb52:
             ton_zmm = dict_zmm12.get(ma_r, 0)
             warning_zmm = ""
             if ton_zmm < target_qty_hq:
-                warning_zmm = "🟡 CẢNH BÁO: ZMM12 THẤP HƠN NHU CẦU | "
+                warning_zmm = t['st_warn_zmm']
 
             # THỰC THI CHẺ DÒNG TRÊN SỔ HD 03
             hd03_sub = df_hd03[df_hd03['Ma_R'] == ma_r].copy()
@@ -517,7 +604,7 @@ if f_inv and f_pkl and f_hd03 and f_zmm12 and f_iop01 and f_mb52:
                 ecus_output.append({
                     'Mã Vật Tư': ma_r, 'ĐVT HQ': unit, 'Lượng Cần Khai': target_qty_hq,
                     'Số TK Gốc': '---', 'Đơn Giá HQ': 0, 'Trị Giá': 0,
-                    'TRẠNG THÁI': "🔴 LỖI: KHÔNG TÌM THẤY TRONG SỔ HD 03"
+                    'TRẠNG THÁI': t['st_err_hd03_miss']
                 })
                 continue
                 
@@ -533,7 +620,7 @@ if f_inv and f_pkl and f_hd03 and f_zmm12 and f_iop01 and f_mb52:
                 take = min(remaining_to_allocate, ton_tk_goc)
                 remaining_to_allocate -= take
                 
-                trang_thai = warning_zmm + "🟢 HỢP LỆ (SẴN SÀNG KHAI)" if not warning_zmm else warning_zmm + "CẦN CHECK LẠI SỔ KẾ TOÁN"
+                trang_thai = warning_zmm + t['st_ok'] if not warning_zmm else warning_zmm + t['st_warn_chk']
                 
                 ecus_output.append({
                     'Mã Vật Tư': ma_r, 
@@ -550,39 +637,17 @@ if f_inv and f_pkl and f_hd03 and f_zmm12 and f_iop01 and f_mb52:
                 ecus_output.append({
                     'Mã Vật Tư': ma_r, 'ĐVT HQ': unit, 'Lượng Cần Khai': round(remaining_to_allocate, 2),
                     'Số TK Gốc': '---', 'Đơn Giá HQ': 0, 'Trị Giá': 0,
-                    'TRẠNG THÁI': "🔴 LỖI: SỔ HD 03 ĐÃ HẾT TỒN"
+                    'TRẠNG THÁI': t['st_err_hd03_empty']
                 })
 
         # 4. HIỂN THỊ KẾT QUẢ
         df_final = pd.DataFrame(ecus_output)
         
-    st.success("🎉 Cỗ máy đã thực thi xong thuật toán Tiền kiểm và Chẻ dòng ECUS!")
+    st.success(t["succ_msg"])
     
-    err_filter = st.toggle("🚨 Chỉ hiển thị các dòng BỊ LỖI / CẢNH BÁO", value=False)
+    err_filter = st.toggle(t["err_filter_lbl"], value=False)
     board_display = df_final[~df_final['TRẠNG THÁI'].str.contains("🟢", regex=False)] if err_filter else df_final
 
     st.data_editor(
         board_display.style.map(
-            lambda x: 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴' in str(x) 
-            else ('background-color:#fef08a; color:#854d0e; font-weight:bold' if '🟡' in str(x) 
-            else ('background-color:#d1fae5; color:#065f46; font-weight:bold' if '🟢' in str(x) else '')), 
-            subset=['TRẠNG THÁI']
-        ),
-        use_container_width=True, hide_index=True, height=500
-    )
-
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df_final.to_excel(writer, index=False, sheet_name='ECUS_UPLOAD')
-    
-    st.download_button(
-        label="📥 TẢI FILE EXCEL CHUẨN ECUS",
-        data=output.getvalue(),
-        file_name=f"ECUS_Data_{datetime.now().strftime('%Y%m%d')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True,
-        type="primary"
-    )
-    st.markdown("</div>", unsafe_allow_html=True)
-else:
-    st.info("💡 Vui lòng tải đủ 6 file hệ thống để cỗ máy tiến hành đối soát đa chiều và sinh Form ECUS.")
+            lambda x: 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴
