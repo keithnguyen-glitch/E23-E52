@@ -269,6 +269,13 @@ class DataEngine:
                     df_clean = df_raw.iloc[header_row_idx + 1:].copy()
                     df_clean.columns = deduplicate_cols(actual_headers)
                     df_clean = df_clean.loc[:, ~df_clean.columns.str.contains('^nan|^Unnamed', case=False)].dropna(how='all')
+                    
+                    # --- BƠM THẦN CHÚ FILL DOWN ---
+                    for col in df_clean.columns:
+                        if any(kw.lower() in str(col).lower() for kw in target_keywords):
+                            df_clean[col] = df_clean[col].ffill()
+                            break
+                    # -------------------------------
                     return df_clean
                 return df_raw.dropna(how='all')
             
@@ -522,7 +529,7 @@ if f_ecus_hang and not st.session_state.data_p1.empty:
     
     # Bảng dữ liệu to, cao, rõ nét
     st.data_editor(
-        board_display.style.applymap(lambda x: 'background-color:#d1fae5; color:#065f46; font-weight:bold' if '🟢' in str(x) else 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴' in str(x) or '❌' in str(x) or '🚨' in str(x) else '', subset=['TRẠNG THÁI CUỐI CÙNG']),
+        board_display.style.map(lambda x: 'background-color:#d1fae5; color:#065f46; font-weight:bold' if '🟢' in str(x) else 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴' in str(x) or '❌' in str(x) or '🚨' in str(x) else '', subset=['TRẠNG THÁI CUỐI CÙNG']),
         use_container_width=True, hide_index=True, height=600
     )
 
