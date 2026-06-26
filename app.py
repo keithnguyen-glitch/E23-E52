@@ -650,4 +650,26 @@ if f_inv and f_pkl and f_hd03 and f_zmm12 and f_iop01 and f_mb52:
 
     st.data_editor(
         board_display.style.map(
-            lambda x: 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴
+            lambda x: 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴' in str(x) 
+            else ('background-color:#fef08a; color:#854d0e; font-weight:bold' if '🟡' in str(x) 
+            else ('background-color:#d1fae5; color:#065f46; font-weight:bold' if '🟢' in str(x) else '')), 
+            subset=['TRẠNG THÁI']
+        ),
+        use_container_width=True, hide_index=True, height=500
+    )
+
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_final.to_excel(writer, index=False, sheet_name='ECUS_UPLOAD')
+    
+    st.download_button(
+        label=t["btn_ecus_xlsx"],
+        data=output.getvalue(),
+        file_name=f"ECUS_Data_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        type="primary"
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+else:
+    st.info(t["miss_file_msg"])
