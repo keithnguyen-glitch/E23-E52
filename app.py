@@ -391,152 +391,198 @@ with st.sidebar:
         st.rerun()
 
 # ==========================================
+# ==========================================
 # 5. GIAO DIỆN CHÍNH (UI TO, RÕ RÀNG)
 # ==========================================
 st.markdown(f"<h1>{t['main_title']}</h1>", unsafe_allow_html=True)
 st.markdown(f"<p style='font-size: 1.15em; color: #475569;'>{t['main_sub']}</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# ----------------- PHASE 0 -----------------
+# ----------------- BƯỚC 1: DATA LAKE (HỨNG 6 FILE CHỨNG TỪ & SAP) -----------------
 st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
-st.markdown(t["phase0_title"])
-st.caption(t["phase0_sub"])
-c0_1, c0_2 = st.columns(2)
-with c0_1:
-    f_pre_inv = st.file_uploader(t["pre_inv_lbl"], type=["xlsx","csv","pdf","jpg","png","jpeg"])
-with c0_2:
-    f_pre_pkl = st.file_uploader(t["pre_pkl_lbl"], type=["xlsx","csv","pdf","jpg","png","jpeg"])
+st.markdown("#### 🗂️ NẠP HỒ DỮ LIỆU ĐỐI CHIẾU")
+st.caption("Kéo thả 6 file thô vào đây. Hệ thống sẽ gọt rác, check tồn kho trước, rồi mới chẻ dòng ECUS.")
 
-if f_pre_inv or f_pre_pkl:
-    df_temp_i = DataEngine.read_smart(f_pre_inv, ['Material code', 'Material', 'Mã'])
-    df_temp_p = DataEngine.read_smart(f_pre_pkl, ['Material code', 'Material', 'Mã'])
-    raw_codes = []
-    for d_node in [df_temp_i, df_temp_p]:
-        if not d_node.empty:
-            col_mat = DataEngine.get_col(d_node, ['Material code', 'Material', 'Mã'], None)
-            if col_mat: raw_codes.extend(d_node[col_mat].dropna().astype(str).tolist())
-    unique_r_codes = sorted(list(set([DataEngine.purify_code(c) for c in raw_codes if c and str(c).lower() != "nan"])))
-    if unique_r_codes:
-        st.success(t["phase0_succ"].format(len(unique_r_codes)))
-        st.text_area(t["phase0_copy"], value="\n".join(unique_r_codes), height=150)
+c1, c2, c3 = st.columns(3)
+with c1: f_inv = st.file_uploader("1. INVOICE (MC)", type=["xlsx","csv"])
+with c2: f_pkl = st.file_uploader("2. PACKING LIST (MC)", type=["xlsx","csv"])
+with c3: f_hd03 = st.file_uploader("3. SỔ HD 03 (HẢI QUAN)", type=["xlsx","csv"])
+
+c4, c5, c6 = st.columns(3)
+with c4: f_zmm12 = st.file_uploader("4. SAP ZMM12 (Nội bộ)", type=["xlsx","csv"])
+with c5: f_iop01 = st.file_uploader("5. SAP IOP01 (Quy đổi)", type=["xlsx","csv"])
+with c6: f_mb52 = st.file_uploader("6. SAP MB52/MB51 (Tồn kho)", type=["xlsx","csv"])
 st.markdown("</div>", unsafe_allow_html=True)
 
-# ----------------- PHASE 1 -----------------
-st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
-st.markdown(t["phase1_title"])
-st.caption(t["phase1_sub"])
-c1_1, c1_2 = st.columns(2)
-with c1_1:
-    f_inv_real = st.file_uploader(t["f_inv_lbl"], type=["xlsx","csv","pdf","jpg","png","jpeg"])
-    f_pkl_real = st.file_uploader(t["f_pkl_lbl"], type=["xlsx","csv","pdf","jpg","png","jpeg"])
-with c1_2:
-    f_cd_real = st.file_uploader(t["f_cd_lbl"], type=["xlsx","csv","pdf","jpg","png","jpeg"])
-    f_sap_zmm = st.file_uploader(t["f_sap_lbl"], type=["xlsx","csv"])
-
-if f_inv_real and f_sap_zmm:
-    r_inv = DataEngine.read_smart(f_inv_real, ['Material code', 'Material', 'Quantity Customs'])
-    r_pkl = DataEngine.read_smart(f_pkl_real, ['Material', 'Quantity', "Q'TY"])
-    r_cd  = DataEngine.read_smart(f_cd_real, ['Mã NL', 'Material', 'Số Lượng'])
-    r_sap = DataEngine.read_smart(f_sap_zmm, ['PO Number', 'Material', 'PO Qty'])
-
-    c_inv_mat = DataEngine.get_col(r_inv, ['Material code', 'Material', 'Mã'], 1)
-    df_inv = r_inv[[c_inv_mat, DataEngine.get_col(r_inv, ['Quantity', 'Số lượng'], 6), DataEngine.get_col(r_inv, ['Unit', 'ĐVT'], 5), DataEngine.get_col(r_inv, ['Price', 'Đơn giá'], 7), DataEngine.get_col(r_inv, ['Amount', 'Thành tiền'], 8)]].dropna(subset=[c_inv_mat]).copy()
-    df_inv.columns = ['Ma_Vat_Tu', 'SL_INV', 'UOM_INV', 'DonGia', 'TriGia']
-    df_inv['Ma_Vat_Tu'] = df_inv['Ma_Vat_Tu'].apply(DataEngine.purify_code)
-    for c in ['SL_INV', 'DonGia', 'TriGia']: df_inv[c] = DataEngine.clean_numeric(df_inv[c])
-    df_inv = df_inv.groupby(['Ma_Vat_Tu', 'UOM_INV', 'DonGia'], as_index=False)[['SL_INV', 'TriGia']].sum()
+# ----------------- BƯỚC 2 & 3: ENGINE TIỀN KIỂM & CHẺ DÒNG FIFO -----------------
+if f_inv and f_pkl and f_hd03 and f_zmm12 and f_iop01 and f_mb52:
+    st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
+    st.markdown("#### 🧠 ENGINE KIỂM TOÁN & TẠO FORM ECUS")
     
-    masters = df_inv['Ma_Vat_Tu'].tolist()
-    master_purified_dict = {DataEngine.purify_code(m): m for m in masters}
+    with st.spinner("Đang chạy thuật toán kiểm kho và khấu trừ FIFO..."):
+        # 1. ĐỌC DỮ LIỆU
+        r_inv = DataEngine.read_smart(f_inv, ['Material code', 'Material'])
+        r_hd03 = DataEngine.read_smart(f_hd03, ['Mã nguyên liệu', 'Material', 'Mã NL'])
+        r_iop01 = DataEngine.read_smart(f_iop01, ['Material', 'NLClass'])
+        r_mb52 = DataEngine.read_smart(f_mb52, ['Material', 'Unrestricted'])
+        r_zmm12 = DataEngine.read_smart(f_zmm12, ['PO Number', 'Material'])
 
-    p_mat = DataEngine.get_col(r_pkl, ['Material', 'Mã'], 0)
-    p_qty = DataEngine.get_col(r_pkl, ["Q'TY", 'Quantity'], 5)
-    df_pkl = pd.DataFrame()
-    df_pkl['Ma_Vat_Tu'] = r_pkl[p_mat].astype(str).str.strip().str.upper().apply(lambda x: DataEngine.fz_match(x, masters, master_purified_dict))
-    df_pkl['SL_PKL'] = DataEngine.clean_numeric(r_pkl[p_qty])
-    df_pkl = df_pkl.groupby('Ma_Vat_Tu', as_index=False)['SL_PKL'].sum()
+        # 2. CHUẨN BỊ BỘ NHỚ DATA
+        # Tồn kho MB52
+        c_mb_mat = DataEngine.get_col(r_mb52, ['Material', 'Mã'], 1)
+        c_mb_stock = DataEngine.get_col(r_mb52, ['Unrestricted', 'Tồn'], 3)
+        df_mb = r_mb52[[c_mb_mat, c_mb_stock]].copy()
+        df_mb.columns = ['Ma_R', 'Ton_Kho_Thuc']
+        df_mb['Ma_R'] = df_mb['Ma_R'].apply(DataEngine.purify_code)
+        df_mb['Ton_Kho_Thuc'] = DataEngine.clean_numeric(df_mb['Ton_Kho_Thuc'])
+        dict_mb52 = df_mb.groupby('Ma_R')['Ton_Kho_Thuc'].sum().to_dict()
 
-    df_cd = pd.DataFrame(columns=['Ma_Vat_Tu', 'SL_ChiDinh'])
-    if not r_cd.empty:
-        cd_mat = DataEngine.get_col(r_cd, ['Mã NL', 'Material'], 1)
-        cd_qty = DataEngine.get_col(r_cd, ['Số Lượng', 'Quantity'], 4)
-        df_cd = pd.DataFrame()
-        df_cd['Ma_Vat_Tu'] = r_cd[cd_mat].astype(str).str.strip().str.upper().apply(lambda x: DataEngine.fz_match(x, masters, master_purified_dict))
-        df_cd['SL_ChiDinh'] = DataEngine.clean_numeric(r_cd[cd_qty])
-        df_cd = df_cd.groupby('Ma_Vat_Tu', as_index=False)['SL_ChiDinh'].sum()
+        # Quy đổi IOP01
+        c_iop_mat = DataEngine.get_col(r_iop01, ['Material'], 1)
+        c_iop_rate = DataEngine.get_col(r_iop01, ['NLRate', 'Tỷ lệ'], 7)
+        c_iop_unit = DataEngine.get_col(r_iop01, ['NLUnit', 'ĐVT'], 6)
+        df_iop = r_iop01[[c_iop_mat, c_iop_rate, c_iop_unit]].copy()
+        df_iop.columns = ['Ma_R', 'NLRate', 'NLUnit']
+        df_iop['Ma_R'] = df_iop['Ma_R'].apply(DataEngine.purify_code)
+        df_iop['NLRate'] = DataEngine.clean_numeric(df_iop['NLRate'])
+        df_iop = df_iop.drop_duplicates(subset=['Ma_R'])
+        
+        # Sổ HD 03 (Nguồn chẻ dòng)
+        c_hd_mat = DataEngine.get_col(r_hd03, ['Mã nguyên liệu', 'Mã NL'], 2)
+        c_hd_tk = DataEngine.get_col(r_hd03, ['Số tờ khai', 'TK'], 0)
+        c_hd_date = DataEngine.get_col(r_hd03, ['Ngày tờ khai', 'Ngày'], 1)
+        c_hd_ton = DataEngine.get_col(r_hd03, ['Lượng tồn', 'Lượng còn lại', 'Balance'], 4)
+        c_hd_price = DataEngine.get_col(r_hd03, ['Đơn giá', 'Price'], 5)
+        df_hd03 = r_hd03[[c_hd_mat, c_hd_tk, c_hd_date, c_hd_ton, c_hd_price]].copy()
+        df_hd03.columns = ['Ma_R', 'So_TK_Goc', 'Ngay_TK', 'Ton_HD03', 'Don_Gia_HQ']
+        df_hd03['Ma_R'] = df_hd03['Ma_R'].apply(DataEngine.purify_code)
+        df_hd03['Ton_HD03'] = DataEngine.clean_numeric(df_hd03['Ton_HD03'])
+        df_hd03['Don_Gia_HQ'] = DataEngine.clean_numeric(df_hd03['Don_Gia_HQ'])
+        
+        # Sổ ZMM12 (Để check chéo)
+        c_zmm_mat = DataEngine.get_col(r_zmm12, ['Material'], 10)
+        c_zmm_ton = DataEngine.get_col(r_zmm12, ['In Qty', 'Qty'], 13)
+        df_zmm12 = r_zmm12[[c_zmm_mat, c_zmm_ton]].copy()
+        df_zmm12.columns = ['Ma_R', 'Ton_ZMM12']
+        df_zmm12['Ma_R'] = df_zmm12['Ma_R'].apply(DataEngine.purify_code)
+        df_zmm12['Ton_ZMM12'] = DataEngine.clean_numeric(df_zmm12['Ton_ZMM12'])
+        dict_zmm12 = df_zmm12.groupby('Ma_R')['Ton_ZMM12'].sum().to_dict()
 
-    c_sap_mat = DataEngine.get_col(r_sap, ['Material'], 10)
-    c_sap_qty = DataEngine.get_col(r_sap, ['PO NL QTY', 'In NL QTY', 'In Qty'], 13)
-    c_sap_nl = DataEngine.get_col(r_sap, ['NL#'], 22)
-    c_sap_desc = DataEngine.get_col(r_sap, ['CUSTOMS DESC'], 23)
-    df_sap_raw = r_sap[[c_sap_mat, c_sap_qty, c_sap_nl, c_sap_desc]].dropna(subset=[c_sap_mat]).copy()
-    df_sap_raw.columns = ['Ma_Vat_Tu', 'SL_SAP', 'Ma_NL_HQ', 'Customs_Desc']
-    df_sap_raw['Ma_Vat_Tu'] = df_sap_raw['Ma_Vat_Tu'].apply(DataEngine.purify_code)
-    df_sap_raw['SL_SAP'] = DataEngine.clean_numeric(df_sap_raw['SL_SAP'])
-    df_sap = df_sap_raw.groupby(['Ma_Vat_Tu', 'Ma_NL_HQ', 'Customs_Desc'], as_index=False)['SL_SAP'].sum()
+        # Nhu cầu Invoice
+        c_inv_mat = DataEngine.get_col(r_inv, ['Material code', 'Material'], 1)
+        c_inv_qty = DataEngine.get_col(r_inv, ['Quantity', 'PO Qty'], 5)
+        df_inv = r_inv[[c_inv_mat, c_inv_qty]].copy()
+        df_inv.columns = ['Ma_R', 'Qty_Invoice']
+        df_inv['Ma_R'] = df_inv['Ma_R'].apply(DataEngine.purify_code)
+        df_inv['Qty_Invoice'] = DataEngine.clean_numeric(df_inv['Qty_Invoice'])
+        inv_grouped = df_inv.groupby('Ma_R')['Qty_Invoice'].sum().reset_index()
 
-    mg_p1 = pd.merge(df_inv, df_pkl, on='Ma_Vat_Tu', how='outer')
-    mg_p1 = pd.merge(mg_p1, df_cd, on='Ma_Vat_Tu', how='outer')
-    mg_p1 = pd.merge(mg_p1, df_sap, on='Ma_Vat_Tu', how='outer').fillna(0)
+        # 3. THUẬT TOÁN TIỀN KIỂM & CHẺ DÒNG FIFO
+        ecus_output = []
+        
+        for _, inv_row in inv_grouped.iterrows():
+            ma_r = inv_row['Ma_R']
+            if not ma_r: continue
+            
+            qty_inv = inv_row['Qty_Invoice']
+            
+            # Tiền kiểm 1: Lấy Tỷ lệ quy đổi
+            rate_info = df_iop[df_iop['Ma_R'] == ma_r]
+            rate = rate_info['NLRate'].iloc[0] if not rate_info.empty else 1.0
+            unit = rate_info['NLUnit'].iloc[0] if not rate_info.empty else "UNK"
+            
+            # Khối lượng Hải quan thực tế cần xử lý
+            target_qty_hq = qty_inv * rate
+            
+            # Tiền kiểm 2: Kiểm tra Âm Kho (MB52)
+            ton_mb52 = dict_mb52.get(ma_r, 0)
+            if ton_mb52 < qty_inv:
+                ecus_output.append({
+                    'Mã Vật Tư': ma_r, 'ĐVT HQ': unit, 'Lượng Cần Khai': target_qty_hq,
+                    'Số TK Gốc': '---', 'Đơn Giá HQ': 0, 'Trị Giá': 0,
+                    'TRẠNG THÁI': f"🔴 LỖI: ÂM KHO MB52 (Tồn: {ton_mb52})"
+                })
+                continue # Kho âm -> Không cho phép chẻ dòng, chặn luôn!
+                
+            # Tiền kiểm 3: Check Sổ Kế toán ZMM12
+            ton_zmm = dict_zmm12.get(ma_r, 0)
+            warning_zmm = ""
+            if ton_zmm < target_qty_hq:
+                warning_zmm = "🟡 CẢNH BÁO: ZMM12 THẤP HƠN NHU CẦU | "
 
-    mg_p1['Lệch_PKL'] = mg_p1['SL_PKL'] - mg_p1['SL_INV']
-    mg_p1['Lệch_SAP'] = mg_p1['SL_SAP'] - mg_p1['SL_INV']
+            # THỰC THI CHẺ DÒNG TRÊN SỔ HD 03
+            hd03_sub = df_hd03[df_hd03['Ma_R'] == ma_r].copy()
+            
+            if hd03_sub.empty:
+                ecus_output.append({
+                    'Mã Vật Tư': ma_r, 'ĐVT HQ': unit, 'Lượng Cần Khai': target_qty_hq,
+                    'Số TK Gốc': '---', 'Đơn Giá HQ': 0, 'Trị Giá': 0,
+                    'TRẠNG THÁI': "🔴 LỖI: KHÔNG TÌM THẤY TRONG SỔ HD 03"
+                })
+                continue
+                
+            # Quét tuần tự từng dòng tờ khai trong HD03
+            remaining_to_allocate = target_qty_hq
+            for _, hd_row in hd03_sub.iterrows():
+                if remaining_to_allocate <= 0: break
+                
+                ton_tk_goc = hd_row['Ton_HD03']
+                if ton_tk_goc <= 0: continue
+                
+                # Bốc lượng: Lấy phần nhỏ hơn giữa nhu cầu và tồn của tờ khai
+                take = min(remaining_to_allocate, ton_tk_goc)
+                remaining_to_allocate -= take
+                
+                trang_thai = warning_zmm + "🟢 HỢP LỆ (SẴN SÀNG KHAI)" if not warning_zmm else warning_zmm + "CẦN CHECK LẠI SỔ KẾ TOÁN"
+                
+                ecus_output.append({
+                    'Mã Vật Tư': ma_r, 
+                    'ĐVT HQ': unit, 
+                    'Lượng Cần Khai': round(take, 2),
+                    'Số TK Gốc': hd_row['So_TK_Goc'], 
+                    'Đơn Giá HQ': hd_row['Don_Gia_HQ'], 
+                    'Trị Giá': round(take * hd_row['Don_Gia_HQ'], 2),
+                    'TRẠNG THÁI': trang_thai
+                })
+            
+            # Nếu vét sạch Sổ HD 03 mà vẫn thiếu lượng
+            if remaining_to_allocate > 0:
+                ecus_output.append({
+                    'Mã Vật Tư': ma_r, 'ĐVT HQ': unit, 'Lượng Cần Khai': round(remaining_to_allocate, 2),
+                    'Số TK Gốc': '---', 'Đơn Giá HQ': 0, 'Trị Giá': 0,
+                    'TRẠNG THÁI': "🔴 LỖI: SỔ HD 03 ĐÃ HẾT TỒN"
+                })
 
-    def eval_p1(r):
-        if r['SL_INV'] == 0: return "❌ LỖI: THIẾU TRÊN INVOICE"
-        tol = tol_weight if r['UOM_INV'] in ['KGM', 'MTK'] else tol_count
-        if abs(r['Lệch_PKL']) > tol: return "🔴 LỆCH ĐÓNG GÓI PKL"
-        if abs(r['Lệch_SAP']) > tol: return "🚨 LỖI LỆCH KHO SAP"
-        return "🟢 KHỚP"
-
-    mg_p1['KẾT LUẬN PHASE 1'] = mg_p1.apply(eval_p1, axis=1)
-    st.markdown(t["tbl1_title"])
-    st.dataframe(mg_p1, use_container_width=True, hide_index=True, height=500)
-    st.session_state.data_p1 = mg_p1
-st.markdown("</div>", unsafe_allow_html=True)
-
-# ----------------- PHASE 2 -----------------
-st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
-st.markdown(t["phase2_title"])
-st.caption(t["phase2_sub"])
-f_ecus_hang = st.file_uploader(t["f_hq_lbl"], type=["xlsx","csv","xls"])
-
-if f_ecus_hang and not st.session_state.data_p1.empty:
-    mg_p2_goc = st.session_state.data_p1.copy()
-    r_hq = DataEngine.read_smart(f_ecus_hang, ['Mã số hàng hóa', 'Mô tả hàng hóa', 'Số lượng (1)'])
+        # 4. HIỂN THỊ KẾT QUẢ
+        df_final = pd.DataFrame(ecus_output)
+        
+    st.success("🎉 Cỗ máy đã thực thi xong thuật toán Tiền kiểm và Chẻ dòng ECUS!")
     
-    masters_p2 = mg_p2_goc['Ma_Vat_Tu'].tolist()
-    df_hq = DataEngine.parse_ecus(r_hq, masters_p2, "HAI_QUAN")
-    mg_final = pd.merge(mg_p2_goc, df_hq, on='Ma_Vat_Tu', how='outer').fillna(0)
+    err_filter = st.toggle("🚨 Chỉ hiển thị các dòng BỊ LỖI / CẢNH BÁO", value=False)
+    board_display = df_final[~df_final['TRẠNG THÁI'].str.contains("🟢", regex=False)] if err_filter else df_final
 
-    # ĐIỂM CHỐT: TỰ ĐỘNG SINH CHUỖI MÔ TẢ HẢI QUAN
-    mg_final['CHUỖI MÔ TẢ HQ (FORM 30+)'] = mg_final['Ma_NL_HQ'].astype(str) + "#&" + mg_final['Customs_Desc'].astype(str)
-    mg_final['Lệch_HQ'] = mg_final['SL_HAI_QUAN'] - mg_final['SL_INV']
-
-    def eval_p2(r):
-        if "❌" in str(r['KẾT LUẬN PHASE 1']) or "🔴" in str(r['KẾT LUẬN PHASE 1']) or "🚨" in str(r['KẾT LUẬN PHASE 1']):
-            return r['KẾT LUẬN PHASE 1']
-        tol = tol_weight if r['UOM_INV'] in ['KGM', 'MTK'] else tol_count
-        if abs(r['Lệch_HQ']) > tol: return "🔴 LỆCH TỜ KHAI HQ"
-        return "🟢 KHỚP HOÀN TOÀN"
-
-    mg_final['TRẠNG THÁI CUỐI CÙNG'] = mg_final.apply(eval_p2, axis=1)
-    mg_final = mg_final.sort_values(by='TRẠNG THÁI CUỐI CÙNG', ascending=False)
-
-    st.markdown(t["tbl2_title"])
-    err_filter = st.toggle(t["toggle_err"], value=False)
-    board_display = mg_final[~mg_final['TRẠNG THÁI CUỐI CÙNG'].str.contains("🟢", regex=False)] if err_filter else mg_final
-    
-    # Bảng dữ liệu to, cao, rõ nét
     st.data_editor(
-        board_display.style.map(lambda x: 'background-color:#d1fae5; color:#065f46; font-weight:bold' if '🟢' in str(x) else 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴' in str(x) or '❌' in str(x) or '🚨' in str(x) else '', subset=['TRẠNG THÁI CUỐI CÙNG']),
-        use_container_width=True, hide_index=True, height=600
+        board_display.style.map(
+            lambda x: 'background-color:#fee2e2; color:#991b1b; font-weight:bold' if '🔴' in str(x) 
+            else ('background-color:#fef08a; color:#854d0e; font-weight:bold' if '🟡' in str(x) 
+            else ('background-color:#d1fae5; color:#065f46; font-weight:bold' if '🟢' in str(x) else '')), 
+            subset=['TRẠNG THÁI']
+        ),
+        use_container_width=True, hide_index=True, height=500
     )
 
-    d1, d2 = st.columns(2)
-    with d1: st.download_button(t["btn_xlsx"], ExportEngine.to_excel(mg_final), "Audit_Report_Final.xlsx", "primary", use_container_width=True)
-    with d2: st.download_button(t["btn_docx"], ExportEngine.to_word(mg_final, t), "Audit_Memo_Final.docx", use_container_width=True)
-
-elif f_ecus_hang and st.session_state.data_p1.empty:
-    st.error(t["err_miss"])
-st.markdown("</div>", unsafe_allow_html=True)
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_final.to_excel(writer, index=False, sheet_name='ECUS_UPLOAD')
+    
+    st.download_button(
+        label="📥 TẢI FILE EXCEL CHUẨN ECUS",
+        data=output.getvalue(),
+        file_name=f"ECUS_Data_{datetime.now().strftime('%Y%m%d')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+        type="primary"
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+else:
+    st.info("💡 Vui lòng tải đủ 6 file hệ thống để cỗ máy tiến hành đối soát đa chiều và sinh Form ECUS.")
