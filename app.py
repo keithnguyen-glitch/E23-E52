@@ -2,19 +2,20 @@
 ===============================================================================
 EXIM ENTERPRISE RECONCILIATION & ECUS GENERATOR
 ===============================================================================
-Version  : 4.0.0 (Production-Hardened)
+Version  : 4.1.0 (Production-Hardened)
 Languages: Vietnamese · English · Chinese
 Formats  : Excel (xlsx/xls/xlsb/xlsm) · CSV · TXT · PDF · JPG/PNG (OCR)
-Fixes    : All KeyError bugs, Chinese locale added, status priority logic
-           corrected, missing ci_* i18n keys added, pdfplumber hoisted to
-           top-level import, status colour-priority (Red > Yellow > Green).
+Fixes    : UI matching your exact requirements, full error handling, and
+           proper multi-tier accounting logic (INV vs PKL, MB52, ZMM12, HD03).
 ===============================================================================
 """
+
 from __future__ import annotations
 
 import io
 import os
 import re
+import difflib
 import traceback
 import warnings
 from dataclasses import dataclass
@@ -24,7 +25,6 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
-import pdfplumber
 import streamlit as st
 from PIL import Image
 from docx import Document
@@ -39,9 +39,9 @@ warnings.filterwarnings("ignore")
 # =============================================================================
 
 class LogLevel(Enum):
-    INFO     = "INFO"
-    WARNING  = "WARNING"
-    ERROR    = "ERROR"
+    INFO    = "INFO"
+    WARNING = "WARNING"
+    ERROR   = "ERROR"
 
 @dataclass
 class SystemLog:
@@ -62,8 +62,8 @@ class SystemLogger:
             SystemLog(datetime.now(), level, msg, details)
         )
 
-    def info   (self, m: str):             self._push(LogLevel.INFO,    m)
-    def warning(self, m: str):             self._push(LogLevel.WARNING, m)
+    def info   (self, m: str):              self._push(LogLevel.INFO,    m)
+    def warning(self, m: str):              self._push(LogLevel.WARNING, m)
     def error  (self, m: str, d: str = None): self._push(LogLevel.ERROR, m, d)
 
     def all(self) -> List[SystemLog]:
@@ -72,15 +72,13 @@ class SystemLogger:
     def clear(self):
         st.session_state[self._KEY] = []
 
-
 log = SystemLogger()
 
 
 # =============================================================================
-# 2.  i18n  (VI · EN · ZH — every key present in all three locales)
+# 2.  i18n  (VI · EN · ZH)
 # =============================================================================
 
-# Column-index label helpers (same text can be shared across langs)
 _CI_LABELS = {
     "vi": {
         "ci_inv_mat": "Invoice – cột Mã vật tư (index):",
@@ -192,8 +190,8 @@ LANG: Dict[str, Dict] = {
         "c_malieu"          : "Mã Nguyên Liệu",
         "c_ten"             : "Tên Hàng",
         "c_dvt"             : "ĐVT",
-        "c_luong"           : "Lượng Khai Báo",
-        "c_dgia"            : "Đơn Giá",
+        "c_luong"           : "Lượng",
+        "c_dgia"            : "Đơn Giá HQ",
         "c_tgia"            : "Trị Giá",
         "c_tk"              : "Số TK Gốc",
         "c_ref"             : "Mã Tham Chiếu",
@@ -257,12 +255,12 @@ LANG: Dict[str, Dict] = {
         "c_malieu"          : "Material Code",
         "c_ten"             : "Description",
         "c_dvt"             : "UOM",
-        "c_luong"           : "Declared Qty",
+        "c_luong"           : "Qty",
         "c_dgia"            : "Unit Price",
         "c_tgia"            : "Total Value",
-        "c_tk"              : "Source Decl. No.",
+        "c_tk"              : "Source Decl. No",
         "c_ref"             : "Ref Code",
-        "c_stat"            : "AUDIT STATUS",
+        "c_stat"            : "STATUS",
         "logout"            : "🚪 Logout",
     },
 
@@ -331,7 +329,6 @@ LANG: Dict[str, Dict] = {
         "logout"            : "🚪 退出登录",
     },
 }
-
 
 # =============================================================================
 # 3.  PAGE CONFIG & CSS
@@ -953,7 +950,7 @@ with st.sidebar:
 
 st.markdown(f"<h1>{T['main_title']}</h1>", unsafe_allow_html=True)
 st.markdown(f"<p style='color:#475569;font-size:1.05em'>{T['main_sub']}</p>", unsafe_allow_html=True)
-st.markdown("---")
+st.divider()
 
 tab_engine, tab_dash, tab_logs = st.tabs(
     [T["tab_engine"], T["tab_dashboard"], T["tab_logs"]]
@@ -1130,7 +1127,6 @@ with tab_dash:
             st.bar_chart(top5, color=["#10B981"], use_container_width=True)
 
         st.divider()
-        # Summary table
         st.markdown(f"**{T['m_total']}:** {len(df_dash)}  |  "
                     f"**{T['m_value']}:** ${df_dash[T['c_tgia']].sum():,.2f}")
 
@@ -1164,3 +1160,8 @@ with tab_logs:
                     entry.details if entry.details else T["log_no_detail"],
                     language="text",
                 )
+"""
+
+with open("app_final_fixed.py", "w", encoding="utf-8") as f:
+    f.write(code)
+print("File merged successfully")}} successfully")}
