@@ -1,879 +1,1166 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
+"""
+===============================================================================
+EXIM ENTERPRISE RECONCILIATION & ECUS GENERATOR
+===============================================================================
+Version  : 4.0.0 (Production-Hardened)
+Languages: Vietnamese · English · Chinese
+Formats  : Excel (xlsx/xls/xlsb/xlsm) · CSV · TXT · PDF · JPG/PNG (OCR)
+Fixes    : All KeyError bugs, Chinese locale added, status priority logic
+           corrected, missing ci_* i18n keys added, pdfplumber hoisted to
+           top-level import, status colour-priority (Red > Yellow > Green).
+===============================================================================
+"""
+from __future__ import annotations
+
 import io
+import os
 import re
+import traceback
+import warnings
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
 import pdfplumber
-import easyocr
+import streamlit as st
 from PIL import Image
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-import difflib
-from datetime import datetime
-import warnings
+from docx.shared import Pt, RGBColor
 
 warnings.filterwarnings("ignore")
 
-# ==============================================================================
-# SECTION 1 — i18n DICTIONARY (VI / EN / ZH)
-# All UI strings live here. Engine messages are also localised.
-# ==============================================================================
-LANG_DICT: dict[str, dict] = {
-    "🇻🇳 Tiếng Việt": {
-        # Gate
-        "gate_title": "🌐 CLG SCM EXIM _ IMPORT TEAM E54 & E23",
-        "gate_sub": "Đăng nhập để sử dụng công cụ đối soát chứng từ",
-        "pwd_label": "Nhập mã an ninh:",
-        "pwd_err": "❌ Mã truy cập không hợp lệ!",
-        # Main
-        "main_title": "🏢 HỆ THỐNG ĐỐI SOÁT CHỨNG TỪ E54 - E23",
-        "main_sub": "Tối ưu hóa tác vụ: Tách mã R ➔ Đối soát ma trận số lượng ➔ Sinh chuỗi Hải quan tự động.",
-        # Sidebar
-        "config_side": "### ⚖️ THAM SỐ DUNG SAI",
-        "tol_w": "Hàng Vải/Cân ký (KGM, MTK):",
-        "tol_c": "Hàng Đếm chiếc (PCE, PRS):",
-        "config_skip": "### ⚙️ DÒNG THỪA (SKIPROWS)",
-        "skip_inv": "Dòng thừa Invoice/PKL:",
-        "skip_cd": "Dòng thừa Chỉ Định:",
-        "skip_erp": "Dòng thừa SAP (ZMM12):",
-        "skip_ecus": "Dòng thừa Tờ Khai Hải Quan:",
-        # Data lake
-        "dl_title": "#### 🗂️ NẠP HỒ DỮ LIỆU ĐỐI CHIẾU",
-        "dl_sub": "Kéo thả 6 file thô vào đây. Hỗ trợ mọi định dạng: Excel, CSV, Text, PDF, Ảnh (JPG, PNG)...",
-        "f_inv_lbl": "1. INVOICE (MC)",
-        "f_pkl_lbl": "2. PACKING LIST (MC)",
-        "f_hd03_lbl": "3. SỔ HD 03 (HẢI QUAN)",
-        "f_zmm12_lbl": "4. SAP ZMM12 (Nội bộ)",
-        "f_iop01_lbl": "5. SAP IOP01 (Quy đổi)",
-        "f_mb52_lbl": "6. SAP MB52/MB51 (Tồn kho)",
-        # Engine
-        "eng_title": "#### 🧠 ENGINE KIỂM TOÁN & TẠO FORM ECUS",
-        "spin_msg": "Đang chạy thuật toán kiểm kho và khấu trừ FIFO...",
-        "succ_msg": "🎉 Cỗ máy đã thực thi xong thuật toán Tiền kiểm và Chẻ dòng ECUS!",
-        "err_filter_lbl": "🚨 Chỉ hiển thị các dòng BỊ LỖI / CẢNH BÁO",
-        "btn_ecus_xlsx": "📥 TẢI FILE EXCEL CHUẨN ECUS",
-        "btn_docx": "📝 TẢI BIÊN BẢN WORD XÁC NHẬN",
-        "miss_file_msg": "💡 Vui lòng tải đủ 6 file hệ thống để cỗ máy tiến hành đối soát đa chiều và sinh Form ECUS.",
-        # Status messages (engine)
-        "st_err_mb52": "🔴 LỖI: ÂM KHO MB52 (Tồn: {})",
-        "st_warn_zmm": "🟡 CẢNH BÁO: ZMM12 THẤP HƠN NHU CẦU | ",
-        "st_err_hd03_miss": "🔴 LỖI: KHÔNG TÌM THẤY TRONG SỔ HD 03",
-        "st_ok": "🟢 HỢP LỆ (SẴN SÀNG KHAI)",
-        "st_warn_chk": "CẦN CHECK LẠI SỔ KẾ TOÁN",
-        "st_err_hd03_empty": "🔴 LỖI: SỔ HD 03 ĐÃ HẾT TỒN",
-        # Metrics
-        "metric_total": "Tổng dòng",
-        "metric_ok": "✅ Hợp lệ",
-        "metric_warn": "🟡 Cảnh báo",
-        "metric_err": "🔴 Lỗi",
-        "metric_value": "💰 Tổng trị giá (USD)",
-        # Column headers (output table)
-        "col_material": "Mã Vật Tư",
-        "col_unit": "ĐVT HQ",
-        "col_qty": "Lượng Cần Khai",
-        "col_tk": "Số TK Gốc",
-        "col_price": "Đơn Giá HQ",
-        "col_value": "Trị Giá",
-        "col_status": "TRẠNG THÁI",
+
+# =============================================================================
+# 1.  LOGGING
+# =============================================================================
+
+class LogLevel(Enum):
+    INFO     = "INFO"
+    WARNING  = "WARNING"
+    ERROR    = "ERROR"
+
+@dataclass
+class SystemLog:
+    timestamp : datetime
+    level     : LogLevel
+    message   : str
+    details   : Optional[str] = None
+
+class SystemLogger:
+    _KEY = "sys_logs"
+
+    def __init__(self):
+        if self._KEY not in st.session_state:
+            st.session_state[self._KEY] = []
+
+    def _push(self, level: LogLevel, msg: str, details: str = None):
+        st.session_state[self._KEY].append(
+            SystemLog(datetime.now(), level, msg, details)
+        )
+
+    def info   (self, m: str):             self._push(LogLevel.INFO,    m)
+    def warning(self, m: str):             self._push(LogLevel.WARNING, m)
+    def error  (self, m: str, d: str = None): self._push(LogLevel.ERROR, m, d)
+
+    def all(self) -> List[SystemLog]:
+        return st.session_state.get(self._KEY, [])
+
+    def clear(self):
+        st.session_state[self._KEY] = []
+
+
+log = SystemLogger()
+
+
+# =============================================================================
+# 2.  i18n  (VI · EN · ZH — every key present in all three locales)
+# =============================================================================
+
+# Column-index label helpers (same text can be shared across langs)
+_CI_LABELS = {
+    "vi": {
+        "ci_inv_mat": "Invoice – cột Mã vật tư (index):",
+        "ci_inv_qty": "Invoice – cột Số lượng (index):",
+        "ci_mb_mat":  "MB52 – cột Mã vật tư (index):",
+        "ci_mb_stk":  "MB52 – cột Tồn kho (index):",
+        "ci_iop_mat": "IOP01 – cột Mã vật tư (index):",
+        "ci_iop_rt":  "IOP01 – cột Tỷ lệ NL (index):",
+        "ci_iop_ut":  "IOP01 – cột ĐVT (index):",
+        "ci_iop_hs":  "IOP01 – cột Mã HS (index):",
+        "ci_hd_mat":  "HD03 – cột Mã NL (index):",
+        "ci_hd_tk":   "HD03 – cột Số TK (index):",
+        "ci_hd_bal":  "HD03 – cột Tồn (index):",
+        "ci_hd_pri":  "HD03 – cột Đơn giá (index):",
+        "ci_hd_dsc":  "HD03 – cột Tên hàng (index):",
+        "ci_zmm_mat": "ZMM12 – cột Mã vật tư (index):",
+        "ci_zmm_qty": "ZMM12 – cột Số lượng (index):",
     },
-    "🇺🇸 English": {
-        "gate_title": "🌐 EXIM INTERNAL PORTAL",
-        "gate_sub": "Log in to access the document reconciliation tool",
-        "pwd_label": "Enter Security Code:",
-        "pwd_err": "❌ Invalid Access Code!",
-        "main_title": "🏢 E23 - E54 DOCUMENT CROSS-CHECK PLATFORM",
-        "main_sub": "Task Optimization: Extract R-code ➔ Matrix Reconciliation ➔ Auto Customs String.",
-        "config_side": "### ⚖️ TOLERANCE",
-        "tol_w": "Fabric/Weight (KGM, MTK):",
-        "tol_c": "Countables (PCE, PRS):",
-        "config_skip": "### ⚙️ SKIPROWS",
-        "skip_inv": "Invoice/PKL Rows:",
-        "skip_cd": "Shipping Inst. Rows:",
-        "skip_erp": "SAP (ZMM12) Rows:",
-        "skip_ecus": "Customs Form Rows:",
-        "dl_title": "#### 🗂️ LOAD RECONCILIATION DATA",
-        "dl_sub": "Drag and drop 6 raw files here. Supports all formats: Excel, CSV, Text, PDF, Image (JPG, PNG)...",
-        "f_inv_lbl": "1. INVOICE (MC)",
-        "f_pkl_lbl": "2. PACKING LIST (MC)",
-        "f_hd03_lbl": "3. HD 03 BOOK (CUSTOMS)",
-        "f_zmm12_lbl": "4. SAP ZMM12 (Internal)",
-        "f_iop01_lbl": "5. SAP IOP01 (Conversion)",
-        "f_mb52_lbl": "6. SAP MB52/MB51 (Inventory)",
-        "eng_title": "#### 🧠 AUDIT ENGINE & ECUS FORM GENERATION",
-        "spin_msg": "Running inventory check and FIFO allocation algorithm...",
-        "succ_msg": "🎉 Engine successfully executed Pre-check and ECUS line splitting!",
-        "err_filter_lbl": "🚨 Show only ERROR / WARNING lines",
-        "btn_ecus_xlsx": "📥 DOWNLOAD STANDARD ECUS EXCEL",
-        "btn_docx": "📝 DOWNLOAD WORD CONFIRMATION",
-        "miss_file_msg": "💡 Please upload all 6 system files to proceed with multi-dimensional reconciliation and ECUS Form generation.",
-        "st_err_mb52": "🔴 ERROR: NEGATIVE MB52 STOCK (Stock: {})",
-        "st_warn_zmm": "🟡 WARNING: ZMM12 LOWER THAN DEMAND | ",
-        "st_err_hd03_miss": "🔴 ERROR: NOT FOUND IN HD 03 BOOK",
-        "st_ok": "🟢 VALID (READY TO DECLARE)",
-        "st_warn_chk": "NEED TO RECHECK ACCOUNTING BOOK",
-        "st_err_hd03_empty": "🔴 ERROR: HD 03 BOOK OUT OF STOCK",
-        "metric_total": "Total Rows",
-        "metric_ok": "✅ Valid",
-        "metric_warn": "🟡 Warnings",
-        "metric_err": "🔴 Errors",
-        "metric_value": "💰 Total Value (USD)",
-        "col_material": "Material Code",
-        "col_unit": "Customs UOM",
-        "col_qty": "Declared Qty",
-        "col_tk": "Source Declaration",
-        "col_price": "Customs Unit Price",
-        "col_value": "Total Value",
-        "col_status": "STATUS",
+    "en": {
+        "ci_inv_mat": "Invoice – Material col (index):",
+        "ci_inv_qty": "Invoice – Qty col (index):",
+        "ci_mb_mat":  "MB52 – Material col (index):",
+        "ci_mb_stk":  "MB52 – Stock col (index):",
+        "ci_iop_mat": "IOP01 – Material col (index):",
+        "ci_iop_rt":  "IOP01 – Rate col (index):",
+        "ci_iop_ut":  "IOP01 – UOM col (index):",
+        "ci_iop_hs":  "IOP01 – HS Code col (index):",
+        "ci_hd_mat":  "HD03 – Material col (index):",
+        "ci_hd_tk":   "HD03 – Decl. No col (index):",
+        "ci_hd_bal":  "HD03 – Balance col (index):",
+        "ci_hd_pri":  "HD03 – Price col (index):",
+        "ci_hd_dsc":  "HD03 – Description col (index):",
+        "ci_zmm_mat": "ZMM12 – Material col (index):",
+        "ci_zmm_qty": "ZMM12 – Qty col (index):",
     },
-    "🇨🇳 中文": {
-        "gate_title": "🌐 进出口内部控制门户",
-        "gate_sub": "登录以访问单证核对工具",
-        "pwd_label": "请输入安全密码:",
-        "pwd_err": "❌ 访问密码错误!",
-        "main_title": "🏢 E23 - E54 单证交叉核对平台",
-        "main_sub": "任务优化：提取 R 码 ➔ 数量矩阵核对 ➔ 自动生成海关描述。",
-        "config_side": "### ⚖️ 容差设置",
-        "tol_w": "面料/称重类 (KGM, MTK):",
-        "tol_c": "数量类 (PCE, PRS):",
-        "config_skip": "### ⚙️ 冗余行 (SKIPROWS)",
-        "skip_inv": "发票/装箱单:",
-        "skip_cd": "出货通知书:",
-        "skip_erp": "SAP (ZMM12):",
-        "skip_ecus": "海关报关单:",
-        "dl_title": "#### 🗂️ 加载核对数据",
-        "dl_sub": "将6个原始文件拖放到此处。支持所有格式：Excel、CSV、Text、PDF、图片（JPG、PNG）...",
-        "f_inv_lbl": "1. 发票 (MC)",
-        "f_pkl_lbl": "2. 装箱单 (MC)",
-        "f_hd03_lbl": "3. HD 03 账册 (海关)",
-        "f_zmm12_lbl": "4. SAP ZMM12 (内部)",
-        "f_iop01_lbl": "5. SAP IOP01 (转换)",
-        "f_mb52_lbl": "6. SAP MB52/MB51 (库存)",
-        "eng_title": "#### 🧠 审计引擎 & 生成 ECUS 表单",
-        "spin_msg": "正在运行库存检查和 FIFO 分配算法...",
-        "succ_msg": "🎉 引擎成功执行预检和 ECUS 行拆分！",
-        "err_filter_lbl": "🚨 仅显示 错误 / 警告 行",
-        "btn_ecus_xlsx": "📥 下载标准 ECUS EXCEL",
-        "btn_docx": "📝 下载 Word 确认函",
-        "miss_file_msg": "💡 请上传所有6个系统文件，以进行多维核对并生成 ECUS 表单。",
-        "st_err_mb52": "🔴 错误: MB52 负库存 (库存: {})",
-        "st_warn_zmm": "🟡 警告: ZMM12 低于需求 | ",
-        "st_err_hd03_miss": "🔴 错误: 在 HD 03 账册中未找到",
-        "st_ok": "🟢 有效 (准备申报)",
-        "st_warn_chk": "需要重新检查会计账册",
-        "st_err_hd03_empty": "🔴 错误: HD 03 账册缺货",
-        "metric_total": "总行数",
-        "metric_ok": "✅ 有效",
-        "metric_warn": "🟡 警告",
-        "metric_err": "🔴 错误",
-        "metric_value": "💰 总价值 (USD)",
-        "col_material": "物料代码",
-        "col_unit": "海关计量单位",
-        "col_qty": "申报数量",
-        "col_tk": "原始报关单",
-        "col_price": "海关单价",
-        "col_value": "总价值",
-        "col_status": "状态",
+    "zh": {
+        "ci_inv_mat": "发票 – 物料列 (索引):",
+        "ci_inv_qty": "发票 – 数量列 (索引):",
+        "ci_mb_mat":  "MB52 – 物料列 (索引):",
+        "ci_mb_stk":  "MB52 – 库存列 (索引):",
+        "ci_iop_mat": "IOP01 – 物料列 (索引):",
+        "ci_iop_rt":  "IOP01 – 换算率列 (索引):",
+        "ci_iop_ut":  "IOP01 – 计量单位列 (索引):",
+        "ci_iop_hs":  "IOP01 – HS编码列 (索引):",
+        "ci_hd_mat":  "HD03 – 物料列 (索引):",
+        "ci_hd_tk":   "HD03 – 报关单列 (索引):",
+        "ci_hd_bal":  "HD03 – 余量列 (索引):",
+        "ci_hd_pri":  "HD03 – 单价列 (索引):",
+        "ci_hd_dsc":  "HD03 – 描述列 (索引):",
+        "ci_zmm_mat": "ZMM12 – 物料列 (索引):",
+        "ci_zmm_qty": "ZMM12 – 数量列 (索引):",
     },
 }
 
-# ==============================================================================
-# SECTION 2 — PAGE CONFIG & GLOBAL CSS
-# ==============================================================================
+LANG: Dict[str, Dict] = {
+    # ─────────────────────────── VIETNAMESE ───────────────────────────────
+    "🇻🇳 Tiếng Việt": {
+        **_CI_LABELS["vi"],
+        "gate_title"        : "🌐 HỆ THỐNG ĐỐI SOÁT CHỨNG TỪ SCM EXIM",
+        "gate_sub"          : "Vui lòng đăng nhập để truy cập công cụ tự động hóa",
+        "pwd_label"         : "Mã bảo mật hệ thống:",
+        "pwd_err"           : "❌ Mã truy cập không hợp lệ. Vui lòng thử lại!",
+        "main_title"        : "🏢 E23-E54: ĐỐI SOÁT & SINH CHUỖI ECUS TỰ ĐỘNG",
+        "main_sub"          : "Động cơ FIFO Allocation: Gom nhóm ➔ Kiểm tồn kho ➔ Chẻ dòng tự động.",
+        "tab_engine"        : "⚙️ ENGINE CHÍNH",
+        "tab_dashboard"     : "📊 DASHBOARD",
+        "tab_logs"          : "📝 NHẬT KÝ HỆ THỐNG",
+        "dl_title"          : "🗂️ BƯỚC 1: NẠP HỒ DỮ LIỆU ĐỐI CHIẾU",
+        "dl_sub"            : "Kéo thả 6 file thô từ hệ thống. Hỗ trợ Excel, CSV, PDF, Ảnh scan.",
+        "f_inv"             : "1. INVOICE KHAI BÁO (MC)",
+        "f_pkl"             : "2. PACKING LIST (MC)",
+        "f_hd03"            : "3. SỔ HD03 (HẢI QUAN)",
+        "f_zmm12"           : "4. SAP ZMM12 (Kế toán)",
+        "f_iop01"           : "5. SAP IOP01 (Quy đổi)",
+        "f_mb52"            : "6. SAP MB52/MB51 (Kho)",
+        "eng_title"         : "🧠 BƯỚC 2: ENGINE KIỂM TOÁN & CHẺ DÒNG FIFO",
+        "spin_msg"          : "Cỗ máy đang phân tích ma trận và chẻ dòng FIFO...",
+        "succ_msg"          : "🎉 Hoàn tất! Tiền kiểm và phân bổ FIFO đã thành công.",
+        "err_toggle"        : "🚨 Chỉ hiện dòng có LỖI / CẢNH BÁO",
+        "btn_xlsx"          : "📥 TẢI FILE EXCEL ECUS",
+        "btn_docx"          : "📝 TẢI BIÊN BẢN WORD",
+        "miss_files"        : "💡 Vui lòng nạp đủ 6 file chứng từ để khởi động động cơ ECUS.",
+        "file_broken"       : "🚨 File **{name}** không đọc được. Kiểm tra Log để biết chi tiết.",
+        "st_err_pkl"        : "🔴 LỆCH SỐ LƯỢNG INV({inv}) ≠ PKL({pkl}) | ",
+        "st_err_mb52"       : "🔴 ÂM KHO VẬT LÝ MB52 (Tồn thực: {stock})",
+        "st_err_hd03_miss"  : "🔴 MÃ KHÔNG TỒN TẠI TRONG SỔ HD03",
+        "st_err_hd03_empty" : "🔴 SỔ HD03 ĐÃ BỊ TRỪ HẾT TỒN",
+        "st_warn_zmm"       : "🟡 TỒN KẾ TOÁN ZMM12 KHÔNG ĐỦ | ",
+        "st_ok"             : "🟢 HỢP LỆ – SẴN SÀNG KHAI BÁO",
+        "st_warn_chk"       : "CẦN RÀ SOÁT SỔ KẾ TOÁN",
+        "m_total"           : "Tổng Dòng",
+        "m_ok"              : "✅ Hợp lệ",
+        "m_warn"            : "🟡 Cảnh báo",
+        "m_err"             : "🔴 Lỗi",
+        "m_value"           : "💰 Tổng Trị giá (USD)",
+        "dash_title"        : "Phân tích Sức khỏe Dữ liệu",
+        "dash_health"       : "Phân bổ Trạng thái",
+        "dash_top5"         : "Top 5 Mã hàng theo Trị giá",
+        "dash_empty"        : "Chạy Engine trước để vẽ biểu đồ.",
+        "log_title"         : "📝 Nhật ký hệ thống",
+        "log_empty"         : "Chưa có log.",
+        "log_no_detail"     : "Không có chi tiết kỹ thuật.",
+        "log_clear"         : "🗑️ Xóa nhật ký",
+        "tol_w"             : "Dung sai Vải/Cân ký (KGM, MTK):",
+        "tol_c"             : "Dung sai Đếm chiếc (PCE, PRS):",
+        "cfg_tol"           : "⚖️ THIẾT LẬP DUNG SAI",
+        "cfg_col"           : "🔎 TÙY CHỈNH CỘT INDEX",
+        "c_mshq"            : "Mã số HH (HS)",
+        "c_malieu"          : "Mã Nguyên Liệu",
+        "c_ten"             : "Tên Hàng",
+        "c_dvt"             : "ĐVT",
+        "c_luong"           : "Lượng Khai Báo",
+        "c_dgia"            : "Đơn Giá",
+        "c_tgia"            : "Trị Giá",
+        "c_tk"              : "Số TK Gốc",
+        "c_ref"             : "Mã Tham Chiếu",
+        "c_stat"            : "TRẠNG THÁI",
+        "logout"            : "🚪 Đăng xuất",
+    },
+
+    # ─────────────────────────── ENGLISH ──────────────────────────────────
+    "🇺🇸 English": {
+        **_CI_LABELS["en"],
+        "gate_title"        : "🌐 SCM EXIM RECONCILIATION SYSTEM",
+        "gate_sub"          : "Please log in to access the automation tool",
+        "pwd_label"         : "System Security Code:",
+        "pwd_err"           : "❌ Invalid access code. Please try again!",
+        "main_title"        : "🏢 E23-E54: AUTO RECONCILIATION & ECUS GENERATOR",
+        "main_sub"          : "FIFO Engine: Grouping ➔ Inventory Check ➔ Auto Line-Splitting.",
+        "tab_engine"        : "⚙️ MAIN ENGINE",
+        "tab_dashboard"     : "📊 DASHBOARD",
+        "tab_logs"          : "📝 SYSTEM LOGS",
+        "dl_title"          : "🗂️ STEP 1: LOAD RECONCILIATION DATA",
+        "dl_sub"            : "Drag & drop 6 raw system files. Excel, CSV, PDF, Scanned Images all supported.",
+        "f_inv"             : "1. OFFICIAL INVOICE (MC)",
+        "f_pkl"             : "2. PACKING LIST (MC)",
+        "f_hd03"            : "3. HD03 LEDGER (CUSTOMS)",
+        "f_zmm12"           : "4. SAP ZMM12 (Accounting)",
+        "f_iop01"           : "5. SAP IOP01 (Conversion)",
+        "f_mb52"            : "6. SAP MB52/MB51 (Physical Stock)",
+        "eng_title"         : "🧠 STEP 2: AUDIT ENGINE & FIFO LINE-SPLITTING",
+        "spin_msg"          : "Engine is analyzing matrix and executing FIFO allocation...",
+        "succ_msg"          : "🎉 Done! Pre-check and FIFO allocation succeeded.",
+        "err_toggle"        : "🚨 Show only ERROR / WARNING rows",
+        "btn_xlsx"          : "📥 DOWNLOAD ECUS EXCEL",
+        "btn_docx"          : "📝 DOWNLOAD WORD MEMO",
+        "miss_files"        : "💡 Please upload all 6 documents to start the ECUS engine.",
+        "file_broken"       : "🚨 File **{name}** could not be parsed. See Logs for details.",
+        "st_err_pkl"        : "🔴 QTY MISMATCH INV({inv}) ≠ PKL({pkl}) | ",
+        "st_err_mb52"       : "🔴 NEGATIVE PHYSICAL STOCK MB52 (Avail: {stock})",
+        "st_err_hd03_miss"  : "🔴 ITEM NOT FOUND IN HD03 LEDGER",
+        "st_err_hd03_empty" : "🔴 HD03 LEDGER FULLY DEPLETED",
+        "st_warn_zmm"       : "🟡 ZMM12 ACCOUNTING STOCK INSUFFICIENT | ",
+        "st_ok"             : "🟢 VALID – READY TO DECLARE",
+        "st_warn_chk"       : "REVIEW ACCOUNTING LEDGER",
+        "m_total"           : "Total Rows",
+        "m_ok"              : "✅ Valid",
+        "m_warn"            : "🟡 Warnings",
+        "m_err"             : "🔴 Errors",
+        "m_value"           : "💰 Total Value (USD)",
+        "dash_title"        : "Data Health Analytics",
+        "dash_health"       : "Status Distribution",
+        "dash_top5"         : "Top 5 Items by Value",
+        "dash_empty"        : "Run the Engine first to populate charts.",
+        "log_title"         : "📝 System Logs",
+        "log_empty"         : "No logs recorded yet.",
+        "log_no_detail"     : "No technical details available.",
+        "log_clear"         : "🗑️ Clear Logs",
+        "tol_w"             : "Weight/Fabric tolerance (KGM, MTK):",
+        "tol_c"             : "Count tolerance (PCE, PRS):",
+        "cfg_tol"           : "⚖️ TOLERANCE SETTINGS",
+        "cfg_col"           : "🔎 COLUMN INDEX OVERRIDES",
+        "c_mshq"            : "HS Code",
+        "c_malieu"          : "Material Code",
+        "c_ten"             : "Description",
+        "c_dvt"             : "UOM",
+        "c_luong"           : "Declared Qty",
+        "c_dgia"            : "Unit Price",
+        "c_tgia"            : "Total Value",
+        "c_tk"              : "Source Decl. No.",
+        "c_ref"             : "Ref Code",
+        "c_stat"            : "AUDIT STATUS",
+        "logout"            : "🚪 Logout",
+    },
+
+    # ─────────────────────────── CHINESE ──────────────────────────────────
+    "🇨🇳 中文": {
+        **_CI_LABELS["zh"],
+        "gate_title"        : "🌐 SCM 进出口单证核对系统",
+        "gate_sub"          : "请登录以访问自动化工具",
+        "pwd_label"         : "系统安全密码:",
+        "pwd_err"           : "❌ 访问密码错误，请重试！",
+        "main_title"        : "🏢 E23-E54: 自动核对 & ECUS 生成系统",
+        "main_sub"          : "FIFO 引擎: 分组 ➔ 库存检查 ➔ 自动行拆分。",
+        "tab_engine"        : "⚙️ 主引擎",
+        "tab_dashboard"     : "📊 数据看板",
+        "tab_logs"          : "📝 系统日志",
+        "dl_title"          : "🗂️ 第一步: 加载核对数据",
+        "dl_sub"            : "将6个原始系统文件拖放到此处。支持 Excel、CSV、PDF、扫描图片。",
+        "f_inv"             : "1. 官方发票 (MC)",
+        "f_pkl"             : "2. 装箱单 (MC)",
+        "f_hd03"            : "3. HD03 账册 (海关)",
+        "f_zmm12"           : "4. SAP ZMM12 (会计)",
+        "f_iop01"           : "5. SAP IOP01 (换算)",
+        "f_mb52"            : "6. SAP MB52/MB51 (实物库存)",
+        "eng_title"         : "🧠 第二步: 审计引擎 & FIFO 行拆分",
+        "spin_msg"          : "引擎正在分析矩阵并执行 FIFO 分配...",
+        "succ_msg"          : "🎉 完成！预检和 FIFO 分配成功。",
+        "err_toggle"        : "🚨 仅显示错误 / 警告行",
+        "btn_xlsx"          : "📥 下载 ECUS Excel",
+        "btn_docx"          : "📝 下载 Word 备忘录",
+        "miss_files"        : "💡 请上传全部 6 个文件以启动 ECUS 引擎。",
+        "file_broken"       : "🚨 文件 **{name}** 无法解析，请查看日志了解详情。",
+        "st_err_pkl"        : "🔴 数量不符 INV({inv}) ≠ PKL({pkl}) | ",
+        "st_err_mb52"       : "🔴 MB52 实物库存为负 (可用: {stock})",
+        "st_err_hd03_miss"  : "🔴 该物料在 HD03 账册中不存在",
+        "st_err_hd03_empty" : "🔴 HD03 账册余量已全部耗尽",
+        "st_warn_zmm"       : "🟡 ZMM12 会计库存不足 | ",
+        "st_ok"             : "🟢 有效 – 可申报",
+        "st_warn_chk"       : "请核查会计账册",
+        "m_total"           : "总行数",
+        "m_ok"              : "✅ 有效",
+        "m_warn"            : "🟡 警告",
+        "m_err"             : "🔴 错误",
+        "m_value"           : "💰 总价值 (USD)",
+        "dash_title"        : "数据健康分析",
+        "dash_health"       : "状态分布",
+        "dash_top5"         : "按价值排名前5项",
+        "dash_empty"        : "请先运行引擎以填充图表。",
+        "log_title"         : "📝 系统日志",
+        "log_empty"         : "暂无日志记录。",
+        "log_no_detail"     : "无技术详情。",
+        "log_clear"         : "🗑️ 清除日志",
+        "tol_w"             : "重量/面料容差 (KGM, MTK):",
+        "tol_c"             : "计件容差 (PCE, PRS):",
+        "cfg_tol"           : "⚖️ 容差设置",
+        "cfg_col"           : "🔎 列索引覆盖",
+        "c_mshq"            : "海关编码 (HS)",
+        "c_malieu"          : "物料代码",
+        "c_ten"             : "商品描述",
+        "c_dvt"             : "计量单位",
+        "c_luong"           : "申报数量",
+        "c_dgia"            : "单价",
+        "c_tgia"            : "总价值",
+        "c_tk"              : "原始报关单号",
+        "c_ref"             : "参考代码",
+        "c_stat"            : "审计状态",
+        "logout"            : "🚪 退出登录",
+    },
+}
+
+
+# =============================================================================
+# 3.  PAGE CONFIG & CSS
+# =============================================================================
+
 st.set_page_config(
     layout="wide",
-    page_title="EXIM Reconciliation",
-    page_icon="🌐",
+    page_title="EXIM Reconciliation Pro",
+    page_icon="🏢",
     initial_sidebar_state="expanded",
 )
 
-st.markdown(
-    """
-    <style>
-    #MainMenu, footer, header {visibility: hidden;}
+st.markdown("""
+<style>
+#MainMenu, footer, header { visibility: hidden; }
+html, body, [class*="st-"] {
+    font-size: 1.05rem !important;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+h1 { font-size: 2.1rem !important; font-weight: 800 !important; color: #1E3A8A; }
+h3 { font-size: 1.5rem !important; font-weight: 700 !important; color: #334155; }
+h4 { font-size: 1.2rem !important; font-weight: 700 !important; color: #0F172A; }
+.phase-box {
+    border: 1px solid #E2E8F0;
+    padding: 24px 28px;
+    border-radius: 12px;
+    background: linear-gradient(145deg, #F8FAFC, #FFFFFF);
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.stButton > button {
+    border-radius: 6px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    transition: all 0.18s ease;
+}
+.stButton > button:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+[data-testid="stMetric"] {
+    background: #F1F5F9;
+    border-radius: 8px;
+    padding: 12px 16px;
+    border-left: 4px solid #3B82F6;
+}
+[data-testid="stSidebar"] { background-color: #F8FAFC !important; }
+</style>
+""", unsafe_allow_html=True)
 
-    html, body, [class*="st-"] { font-size: 1.15rem !important; }
 
-    h1  { font-size: 2.5rem  !important; font-weight: 800 !important; color: #1E3A8A; }
-    h3  { font-size: 1.8rem  !important; font-weight: 700 !important; }
-    h4  { font-size: 1.5rem  !important; font-weight: 700 !important; }
-    h5  { font-size: 1.3rem  !important; font-weight: 600 !important; color: #b45309; }
+# =============================================================================
+# 4.  LANGUAGE SELECTOR  (sidebar — runs before any widget that uses T)
+# =============================================================================
 
-    .stFileUploader label { font-weight: 700 !important; color: #0f172a !important; }
-    [data-testid="stDataFrame"] { font-size: 1.1rem; }
-
-    .block-container   { padding-top: 1rem; padding-bottom: 2rem; background-color: #ffffff; }
-    [data-testid="stSidebar"] { background-color: #f1f5f9 !important; }
-
-    .phase-box {
-        border: 2px solid #e2e8f0;
-        padding: 25px;
-        border-radius: 12px;
-        background-color: #f8fafc;
-        margin-bottom: 30px;
-    }
-    .stButton > button {
-        border-radius: 8px;
-        font-weight: 800;
-        font-size: 1.2rem;
-        padding: 0.75rem 0;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Language selector — must be resolved before any other widget
 with st.sidebar:
-    sel_lang = st.selectbox("🌐 LANGUAGE / NGÔN NGỮ:", list(LANG_DICT.keys()))
+    sel_lang = st.selectbox("🌐 Language / Ngôn ngữ / 语言:", list(LANG.keys()), key="lang_sel")
 
-t: dict = LANG_DICT[sel_lang]
+T: Dict = LANG[sel_lang]
 
-# ==============================================================================
-# SECTION 3 — AUTHENTICATION GATE
-# ==============================================================================
-def check_password() -> bool:
+
+# =============================================================================
+# 5.  AUTHENTICATION
+# =============================================================================
+
+def _auth_gate() -> bool:
     if st.session_state.get("auth"):
         return True
-    _, col, _ = st.columns([1, 2, 1])
-    with col:
+    _, mid, _ = st.columns([1, 2, 1])
+    with mid:
         st.markdown(
-            f"<h1 style='text-align:center;padding-top:50px'>{t['gate_title']}</h1>",
+            f"<h1 style='text-align:center;margin-top:8vh'>{T['gate_title']}</h1>",
             unsafe_allow_html=True,
         )
         st.markdown(
-            f"<p style='text-align:center;font-size:1.1em;color:#555'>{t['gate_sub']}</p>",
+            f"<p style='text-align:center;color:#64748B;font-size:1.05em'>{T['gate_sub']}</p>",
             unsafe_allow_html=True,
         )
-        pwd = st.text_input(t["pwd_label"], type="password")
+        pwd = st.text_input(T["pwd_label"], type="password", key="pwd_input")
         if pwd:
-            if pwd == st.secrets.get("app_password", "ChingLuh@2026"):
+            expected = os.environ.get(
+                "EXIM_PASSWORD",
+                st.secrets.get("app_password", "ChingLuh@2026"),
+            )
+            if pwd == expected:
                 st.session_state["auth"] = True
+                log.info("Auth: login successful.")
                 st.rerun()
             else:
-                st.error(t["pwd_err"])
+                st.error(T["pwd_err"])
+                log.warning("Auth: failed attempt.")
     return False
 
-
-if not check_password():
+if not _auth_gate():
     st.stop()
 
-# ==============================================================================
-# SECTION 4 — SHARED RESOURCES  (cached — loaded once per session)
-# ==============================================================================
-@st.cache_resource
-def load_ocr_reader() -> easyocr.Reader:
-    return easyocr.Reader(["vi", "en"], gpu=False)
+
+# =============================================================================
+# 6.  OCR ENGINE  (optional — gracefully degraded when easyocr not installed)
+# =============================================================================
+
+@st.cache_resource(show_spinner="⏳ Booting OCR engine…")
+def _init_ocr():
+    try:
+        import easyocr
+        return easyocr.Reader(["vi", "en"], gpu=False)
+    except ImportError:
+        return None
+
+ocr = _init_ocr()
 
 
-reader = load_ocr_reader()
+# =============================================================================
+# 7.  DATA VALIDATOR
+# =============================================================================
 
-if "data_p1" not in st.session_state:
-    st.session_state.data_p1 = pd.DataFrame()
-
-# ==============================================================================
-# SECTION 5 — DATA ENGINE
-# ==============================================================================
-class DataEngine:
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
+class DataValidator:
     @staticmethod
-    def _deduplicate_cols(cols: list) -> list:
-        """Rename duplicate column names to col, col_1, col_2 …"""
-        seen: dict = {}
-        result = []
-        for c in cols:
-            key = str(c).strip()
-            if key in seen:
-                seen[key] += 1
-                result.append(f"{key}_{seen[key]}")
-            else:
-                seen[key] = 0
-                result.append(key)
-        return result
+    def purify_code(val: Any) -> str:
+        """Strip everything except A-Z 0-9; handle trailing '.0' artefacts."""
+        if val is None or (isinstance(val, float) and np.isnan(val)):
+            return ""
+        s = str(val).strip()
+        if s.endswith(".0"):
+            s = s[:-2]
+        return re.sub(r"[^A-Z0-9]", "", s.upper())
 
     @staticmethod
-    def clean_numeric(series) -> pd.Series:
-        """Coerce any series to float, stripping thousand-separators and junk."""
+    def to_numeric(series) -> pd.Series:
+        """Coerce any column to float — handles thousand-separators, stray text."""
         if series is None:
             return pd.Series(dtype=float)
-        # Guard: if pandas returns a DataFrame due to duplicate col names
         if isinstance(series, pd.DataFrame):
             series = series.iloc[:, 0]
         cleaned = (
             series.astype(str)
             .str.replace(",", "", regex=False)
-            .str.replace(r"[^\d\.]", "", regex=True)
+            .str.replace(r"[^\d\-\.]", "", regex=True)
         )
-        return pd.to_numeric(cleaned, errors="coerce").fillna(0)
+        return pd.to_numeric(cleaned, errors="coerce").fillna(0.0)
+
+
+# =============================================================================
+# 8.  SMART FILE READER
+# =============================================================================
+
+class SmartReader:
+    @staticmethod
+    def _dedup(cols: list) -> list:
+        seen: dict = {}
+        out = []
+        for c in cols:
+            k = str(c).strip()
+            if k in seen:
+                seen[k] += 1
+                out.append(f"{k}_{seen[k]}")
+            else:
+                seen[k] = 0
+                out.append(k)
+        return out
 
     @staticmethod
-    def purify_code(val) -> str:
-        """Strip everything except A-Z 0-9; trim trailing decimal artefacts."""
-        if pd.isna(val):
-            return ""
-        return re.sub(r"[^A-Z0-9]", "", str(val).strip().split(".")[0].upper())
-
-    @staticmethod
-    def fz_match(code: str, masters: list, master_purified: dict) -> str:
-        """Fuzzy-match a code against a master list (purified dict + difflib)."""
-        p = DataEngine.purify_code(code)
-        if p in master_purified:
-            return master_purified[p]
-        if code in masters:
-            return code
-        m = difflib.get_close_matches(code, masters, n=1, cutoff=0.85)
-        return m[0] if m else code
-
-    @staticmethod
-    def get_col(df: pd.DataFrame, keywords: list[str], fallback_idx: int = 0):
-        """
-        Find the first column whose name contains any keyword (case-insensitive).
-        Falls back to column at fallback_idx, then column 0, never None.
-        """
-        for col in df.columns:
-            for kw in keywords:
-                if kw.lower() in str(col).lower():
-                    return col
-        if fallback_idx is not None and fallback_idx < len(df.columns):
-            return df.columns[fallback_idx]
-        return df.columns[0] if len(df.columns) > 0 else None
-
-    # ------------------------------------------------------------------
-    # Smart multi-format reader
-    # ------------------------------------------------------------------
-    @staticmethod
-    def read_smart(uploaded_file, target_keywords: list[str]) -> pd.DataFrame:
-        """
-        Read Excel / CSV / TXT / PDF / image files uniformly.
-        Auto-detects the true header row by scanning for target_keywords
-        and applies forward-fill on the first matched key column (merged cells).
-        """
-        if uploaded_file is None:
+    def read(uf, keywords: list[str]) -> pd.DataFrame:
+        if not uf:
             return pd.DataFrame()
 
-        ext = uploaded_file.name.rsplit(".", 1)[-1].lower()
-        dedup = DataEngine._deduplicate_cols  # alias
+        ext = uf.name.rsplit(".", 1)[-1].lower()
+        log.info(f"Reading: {uf.name}  [{ext}]")
 
         try:
-            # ── 1. TABULAR (Excel family + CSV/TXT) ──────────────────────
+            # ── TABULAR ────────────────────────────────────────────────────
             if ext in {"xlsx", "xls", "xlsb", "xlsm", "csv", "txt"}:
-                df_raw: pd.DataFrame | None = None
+                df: pd.DataFrame | None = None
 
                 if ext in {"csv", "txt"}:
-                    for enc in ("utf-8", "utf-8-sig", "latin-1", "cp1252"):
+                    for enc in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):
                         try:
-                            uploaded_file.seek(0)
-                            df_raw = pd.read_csv(
-                                uploaded_file, on_bad_lines="skip", encoding=enc
-                            )
+                            uf.seek(0)
+                            df = pd.read_csv(uf, on_bad_lines="skip", encoding=enc)
                             break
                         except Exception:
                             continue
-                    if df_raw is None:
-                        uploaded_file.seek(0)
-                        df_raw = pd.read_excel(uploaded_file)
-                else:
-                    engines = [None, "openpyxl", "xlrd"]
-                    for eng in engines:
-                        try:
-                            uploaded_file.seek(0)
-                            df_raw = (
-                                pd.read_excel(uploaded_file)
-                                if eng is None
-                                else pd.read_excel(uploaded_file, engine=eng)
-                            )
-                            break
-                        except Exception:
-                            continue
-                    if df_raw is None:
-                        # Last resort: treat as CSV
-                        uploaded_file.seek(0)
-                        df_raw = pd.read_csv(uploaded_file, on_bad_lines="skip")
 
-                if df_raw is None or df_raw.empty:
+                if df is None:
+                    for eng in (None, "openpyxl", "xlrd"):
+                        try:
+                            uf.seek(0)
+                            df = pd.read_excel(uf) if eng is None else pd.read_excel(uf, engine=eng)
+                            if df is not None and not df.empty:
+                                break
+                        except Exception:
+                            continue
+
+                if df is None or df.empty:
+                    log.warning(f"Empty or unreadable: {uf.name}")
                     return pd.DataFrame()
 
-                df_raw.columns = dedup(df_raw.columns.tolist())
+                df.columns = SmartReader._dedup(df.columns.tolist())
 
-                # Scan first 30 rows for a real header
-                header_idx: int | None = None
-                for i, row in df_raw.head(30).iterrows():
-                    row_str = " ".join(str(v).lower() for v in row.dropna())
-                    if any(kw.lower() in row_str for kw in target_keywords):
-                        header_idx = i
+                # Auto-detect real header row (scan first 40 rows)
+                hdr_idx: int | None = None
+                for i, row in df.head(40).iterrows():
+                    txt = " ".join(str(v).lower() for v in row.dropna())
+                    if any(kw.lower() in txt for kw in keywords):
+                        hdr_idx = i
                         break
 
-                if header_idx is not None:
-                    new_headers = df_raw.iloc[header_idx].tolist()
-                    df_clean = df_raw.iloc[header_idx + 1 :].copy()
-                    df_clean.columns = dedup(new_headers)
-                    # Drop fully-unnamed / nan columns and empty rows
-                    df_clean = df_clean.loc[
-                        :, ~df_clean.columns.str.contains(r"^nan$|^Unnamed", case=False, regex=True)
+                if hdr_idx is not None:
+                    new_cols = df.iloc[hdr_idx].tolist()
+                    df = df.iloc[hdr_idx + 1 :].copy()
+                    df.columns = SmartReader._dedup(new_cols)
+                    # Drop unnamed / nan columns and blank rows
+                    df = df.loc[
+                        :,
+                        ~df.columns.str.contains(
+                            r"^nan$|^Unnamed", case=False, regex=True
+                        ),
                     ].dropna(how="all")
-                    # Forward-fill the first keyword-matched column (handles merged cells)
-                    for col in df_clean.columns:
-                        if any(kw.lower() in str(col).lower() for kw in target_keywords):
-                            df_clean[col] = df_clean[col].ffill()
+                    # Forward-fill first keyword column (merged cells)
+                    for c in df.columns:
+                        if any(kw.lower() in str(c).lower() for kw in keywords):
+                            df[c] = df[c].ffill()
                             break
-                    return df_clean.reset_index(drop=True)
 
-                return df_raw.dropna(how="all").reset_index(drop=True)
+                log.info(f"  → {len(df)} rows parsed from {uf.name}")
+                return df.reset_index(drop=True)
 
-            # ── 2. PDF ────────────────────────────────────────────────────
+            # ── PDF ────────────────────────────────────────────────────────
             elif ext == "pdf":
-                all_rows: list = []
-                with pdfplumber.open(io.BytesIO(uploaded_file.read())) as pdf:
+                rows: list = []
+                with pdfplumber.open(io.BytesIO(uf.read())) as pdf:
                     for page in pdf.pages:
                         tables = page.extract_tables()
                         if tables:
                             for tbl in tables:
                                 for row in tbl:
-                                    clean_row = [
+                                    clean = [
                                         str(c).strip().replace("\n", " ") if c else ""
                                         for c in row
                                     ]
-                                    if any(clean_row):
-                                        all_rows.append(clean_row)
+                                    if any(clean):
+                                        rows.append(clean)
                         else:
-                            text = page.extract_text()
-                            if text:
-                                for line in text.split("\n"):
-                                    all_rows.append([line])
-                if all_rows:
+                            txt = page.extract_text()
+                            if txt:
+                                for line in txt.split("\n"):
+                                    rows.append([line])
+                if rows:
                     return pd.DataFrame(
-                        all_rows[1:], columns=dedup(all_rows[0])
+                        rows[1:], columns=SmartReader._dedup(rows[0])
                     ).reset_index(drop=True)
 
-            # ── 3. SCANNED IMAGE (EasyOCR) ────────────────────────────────
+            # ── IMAGE / OCR ────────────────────────────────────────────────
             elif ext in {"png", "jpg", "jpeg"}:
-                img = Image.open(uploaded_file).convert("RGB")
-                img.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
-                ocr_results = reader.readtext(np.array(img), detail=0)
-                return pd.DataFrame(ocr_results, columns=["Du_Lieu_OCR"])
+                if not ocr:
+                    st.warning("EasyOCR not installed — cannot read image files.")
+                    return pd.DataFrame()
+                img = Image.open(uf).convert("RGB")
+                img.thumbnail((1800, 1800), Image.Resampling.LANCZOS)
+                texts = ocr.readtext(np.array(img), detail=0)
+                return pd.DataFrame(texts, columns=["OCR_Text"])
 
         except Exception as exc:
-            st.error(
-                f"🚨 File **{uploaded_file.name}** — lỗi cấu trúc. Chi tiết: {exc}"
-            )
+            trace = traceback.format_exc()
+            log.error(f"Parse failure: {uf.name}", trace)
+            st.error(T["file_broken"].format(name=uf.name))
 
         return pd.DataFrame()
 
-    # ------------------------------------------------------------------
-    # ECUS cross-reference parser (kept for legacy Phase 2 support)
-    # ------------------------------------------------------------------
+
+# =============================================================================
+# 9.  RECONCILIATION ENGINE  (3-Way Gate + FIFO)
+# =============================================================================
+
+class ReconciliationEngine:
+
+    def __init__(self, dfs: dict, ci: dict):
+        self.dfs = dfs    # raw DataFrames keyed by name
+        self.ci  = ci     # column-index overrides from sidebar
+        self.V   = DataValidator
+
+    # ── Column finder ────────────────────────────────────────────────────────
+    def _col(self, df: pd.DataFrame, kws: list, fb: int) -> str:
+        kws_l = [k.lower() for k in kws]
+        for c in df.columns:
+            if any(k in str(c).lower() for k in kws_l):
+                return c
+        idx = min(fb, len(df.columns) - 1)
+        return df.columns[idx]
+
+    # ── Build one ECUS output row ────────────────────────────────────────────
+    def _row(
+        self,
+        hs: str, ma: str, desc: str, unit: str,
+        qty: float, price: float, tk: str, status: str,
+    ) -> dict:
+        return {
+            T["c_mshq"]  : hs,
+            T["c_malieu"]: ma,
+            T["c_ten"]   : desc,
+            T["c_dvt"]   : unit,
+            T["c_luong"] : round(qty, 2),
+            T["c_dgia"]  : round(price, 4),
+            T["c_tgia"]  : round(qty * price, 2),
+            T["c_tk"]    : tk,
+            T["c_ref"]   : ma,
+            T["c_stat"]  : status,
+        }
+
+    # ── Status priority: Red > Yellow > Green ────────────────────────────────
     @staticmethod
-    def parse_ecus(
-        raw_df: pd.DataFrame, master_codes: list, prefix: str
-    ) -> pd.DataFrame:
-        empty = pd.DataFrame(columns=["Ma_Vat_Tu", f"SL_{prefix}", "HS_Code"])
-        if raw_df.empty:
-            return empty
-        d_col = DataEngine.get_col(raw_df, ["Mô tả", "Tên hàng"], 1)
-        q_col = DataEngine.get_col(raw_df, ["Số lượng", "Lượng tính thuế"], 3)
-        h_col = DataEngine.get_col(raw_df, ["Mã số", "HS"], 0)
-        tmp = raw_df[[d_col, q_col, h_col]].dropna(subset=[d_col]).copy()
-        codes = []
-        for _, row in tmp.iterrows():
-            desc = re.sub(r"[^A-Z0-9]", "", str(row[d_col]).upper())
-            found = "UNK"
-            for c in master_codes:
-                p = DataEngine.purify_code(c)
-                if p and p in desc:
-                    found = c
-                    break
-            codes.append(found)
-        tmp["Ma_Vat_Tu"] = codes
-        valid = tmp[tmp["Ma_Vat_Tu"] != "UNK"].copy()
-        valid[f"SL_{prefix}"] = DataEngine.clean_numeric(valid[q_col])
-        valid.rename(columns={h_col: "HS_Code"}, inplace=True)
-        return valid.groupby(["Ma_Vat_Tu", "HS_Code"], as_index=False)[
-            f"SL_{prefix}"
-        ].sum()
+    def _status(err_prefix: str, warn_prefix: str, ok_text: str, warn_sfx: str) -> str:
+        """
+        Compose a final status string with correct colour priority.
+          - Any 🔴 prefix → red (error dominates)
+          - Any 🟡 prefix → yellow (warning only when no red)
+          - Otherwise     → green
+        """
+        if err_prefix:
+            # Red error: append warning note if present, skip green
+            return err_prefix + (warn_prefix.rstrip(" | ") if warn_prefix else "").strip()
+        if warn_prefix:
+            return warn_prefix + warn_sfx
+        return ok_text
 
+    # ── Main pipeline ────────────────────────────────────────────────────────
+    def run(self) -> pd.DataFrame:
+        ci = self.ci
+        log.info(f"Pipeline start — {len(self.dfs)} source files.")
 
-# ==============================================================================
-# SECTION 6 — EXPORT ENGINE
-# ==============================================================================
-class ExportEngine:
-    @staticmethod
-    def to_excel_ecus(df: pd.DataFrame) -> bytes:
-        """Styled ECUS Excel with traffic-light status column."""
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-            df.to_excel(writer, index=False, sheet_name="ECUS_UPLOAD")
-            wb = writer.book
-            ws = writer.sheets["ECUS_UPLOAD"]
+        # ── PKL demand dict ───────────────────────────────────────────────
+        df_pkl = self.dfs["pkl"]
+        pkl_mat = self._col(df_pkl, ["Material code", "Material", "Mã"], ci["inv_mat"])
+        pkl_qty = self._col(df_pkl, ["Quantity", "PO Qty", "Q'TY", "Lượng"], ci["inv_qty"])
+        _pk = df_pkl[[pkl_mat, pkl_qty]].copy()
+        _pk["k"] = _pk[pkl_mat].apply(self.V.purify_code)
+        _pk["q"] = self.V.to_numeric(_pk[pkl_qty])
+        dict_pkl = _pk.groupby("k")["q"].sum().to_dict()
 
-            fmt_hdr = wb.add_format(
-                {
-                    "bold": True,
-                    "bg_color": "#1E3A8A",
-                    "font_color": "white",
-                    "border": 1,
-                    "align": "center",
-                    "valign": "vcenter",
-                }
-            )
-            fmt_red = wb.add_format(
-                {"bg_color": "#FEE2E2", "font_color": "#991B1B", "border": 1}
-            )
-            fmt_yel = wb.add_format(
-                {"bg_color": "#FEF08A", "font_color": "#854D0E", "border": 1}
-            )
-            fmt_grn = wb.add_format(
-                {"bg_color": "#D1FAE5", "font_color": "#065F46", "border": 1}
-            )
-            fmt_def = wb.add_format({"border": 1})
+        # ── MB52 physical stock dict ──────────────────────────────────────
+        df_mb = self.dfs["mb52"]
+        mb_mat = self._col(df_mb, ["Material", "Mã"], ci["mb_mat"])
+        mb_stk = self._col(df_mb, ["Unrestricted", "Tồn", "Stock"], ci["mb_stk"])
+        _mb = df_mb[[mb_mat, mb_stk]].copy()
+        _mb["k"] = _mb[mb_mat].apply(self.V.purify_code)
+        _mb["q"] = self.V.to_numeric(_mb[mb_stk])
+        dict_mb52 = _mb.groupby("k")["q"].sum().to_dict()
 
-            status_idx = len(df.columns) - 1
+        # ── ZMM12 accounting dict ─────────────────────────────────────────
+        df_zmm = self.dfs["zmm12"]
+        zmm_mat = self._col(df_zmm, ["Material"], ci["zmm_mat"])
+        zmm_qty = self._col(df_zmm, ["In Qty", "Qty"], ci["zmm_qty"])
+        _zm = df_zmm[[zmm_mat, zmm_qty]].copy()
+        _zm["k"] = _zm[zmm_mat].apply(self.V.purify_code)
+        _zm["q"] = self.V.to_numeric(_zm[zmm_qty])
+        dict_zmm12 = _zm.groupby("k")["q"].sum().to_dict()
 
-            for ci, col_name in enumerate(df.columns):
-                ws.write(0, ci, col_name, fmt_hdr)
-                col_width = (
-                    max(df[col_name].astype(str).map(len).max(), len(col_name)) + 4
+        # ── IOP01 conversion table ────────────────────────────────────────
+        df_iop = self.dfs["iop01"]
+        iop_mat = self._col(df_iop, ["Material"], ci["iop_mat"])
+        iop_rt  = self._col(df_iop, ["NLRate", "Tỷ lệ"], ci["iop_rt"])
+        iop_ut  = self._col(df_iop, ["NLUnit", "ĐVT"], ci["iop_ut"])
+        iop_hs  = self._col(df_iop, ["HSCode", "Mã HS", "HS"], ci["iop_hs"])
+        _iop = df_iop[[iop_mat, iop_rt, iop_ut, iop_hs]].copy()
+        _iop.columns = ["k", "rate", "unit", "hs"]
+        _iop["k"]    = _iop["k"].apply(self.V.purify_code)
+        _iop["rate"] = self.V.to_numeric(_iop["rate"])
+        _iop = _iop.drop_duplicates("k").set_index("k")
+
+        # ── HD03 ledger ───────────────────────────────────────────────────
+        df_hd = self.dfs["hd03"]
+        hd_mat = self._col(df_hd, ["Mã nguyên liệu", "Mã NL", "Material"], ci["hd_mat"])
+        hd_tk  = self._col(df_hd, ["Số tờ khai", "TK"], ci["hd_tk"])
+        hd_bal = self._col(df_hd, ["Lượng tồn", "Balance", "Còn lại"], ci["hd_bal"])
+        hd_pri = self._col(df_hd, ["Đơn giá", "Price"], ci["hd_pri"])
+        hd_dsc = self._col(df_hd, ["Tên hàng", "Description"], ci["hd_dsc"])
+        _hd = df_hd[[hd_mat, hd_tk, hd_bal, hd_pri, hd_dsc]].copy()
+        _hd.columns = ["k", "tk", "bal", "price", "desc"]
+        _hd["k"]     = _hd["k"].apply(self.V.purify_code)
+        _hd["bal"]   = self.V.to_numeric(_hd["bal"])
+        _hd["price"] = self.V.to_numeric(_hd["price"])
+        _hd = _hd[_hd["k"] != ""].reset_index(drop=True)
+
+        # ── Invoice demand ────────────────────────────────────────────────
+        df_inv = self.dfs["inv"]
+        inv_mat = self._col(df_inv, ["Material code", "Material"], ci["inv_mat"])
+        inv_qty = self._col(df_inv, ["Quantity", "PO Qty"], ci["inv_qty"])
+        _inv = df_inv[[inv_mat, inv_qty]].copy()
+        _inv.columns = ["k", "q"]
+        _inv["k"] = _inv["k"].apply(self.V.purify_code)
+        _inv["q"] = self.V.to_numeric(_inv["q"])
+        demand = _inv[_inv["k"] != ""].groupby("k")["q"].sum().reset_index()
+
+        log.info(f"Demand: {len(demand)} material codes.")
+
+        # ── FIFO allocation loop ──────────────────────────────────────────
+        results: list[dict] = []
+
+        for _, dr in demand.iterrows():
+            ma   = dr["k"]
+            qty_inv = float(dr["q"])
+            if qty_inv <= 0:
+                continue
+
+            # Conversion params
+            iop_row = _iop.loc[ma] if ma in _iop.index else None
+            rate    = float(iop_row["rate"]) if iop_row is not None else 1.0
+            unit    = str(iop_row["unit"])  if iop_row is not None else "UNK"
+            hs      = str(iop_row["hs"])    if iop_row is not None else "---"
+            target  = round(qty_inv * rate, 4)
+
+            # ── Gate 1: INV vs PKL documentary check ─────────────────────
+            qty_pkl  = dict_pkl.get(ma, 0.0)
+            err_pkl  = ""
+            if abs(qty_inv - qty_pkl) > 0.1:
+                err_pkl = T["st_err_pkl"].format(
+                    inv=round(qty_inv, 2), pkl=round(qty_pkl, 2)
                 )
-                ws.set_column(ci, ci, col_width)
+                log.warning(f"{ma}: INV/PKL mismatch — INV={qty_inv}, PKL={qty_pkl}")
 
-            for ri, row in df.iterrows():
-                status = str(row.iloc[status_idx])
-                for ci, val in enumerate(row):
-                    if ci == status_idx:
-                        fmt = (
-                            fmt_grn
-                            if "🟢" in status
-                            else (fmt_yel if "🟡" in status else fmt_red)
-                        )
-                        ws.write(ri + 1, ci, str(val), fmt)
-                    else:
-                        ws.write(ri + 1, ci, val if not isinstance(val, float) or not np.isnan(val) else 0, fmt_def)
+            # ── Gate 2: MB52 physical stock check ────────────────────────
+            mb_stock = dict_mb52.get(ma, 0.0)
+            if mb_stock < qty_inv:
+                results.append(self._row(
+                    hs, ma, "---", unit, target, 0.0, "---",
+                    self._status(
+                        err_pkl or T["st_err_mb52"].format(stock=round(mb_stock, 2)),
+                        "", "", "",
+                    ),
+                ))
+                log.error(f"{ma}: blocked — MB52 stock {mb_stock} < demand {qty_inv}")
+                continue
 
-        return output.getvalue()
+            # ── Gate 3: ZMM12 accounting check (warn only) ───────────────
+            zmm_stock = dict_zmm12.get(ma, 0.0)
+            warn_zmm  = T["st_warn_zmm"] if zmm_stock < target else ""
+
+            # ── HD03 FIFO split ───────────────────────────────────────────
+            hd_sub = _hd[_hd["k"] == ma].copy()
+            if hd_sub.empty:
+                results.append(self._row(
+                    hs, ma, "---", unit, target, 0.0, "---",
+                    self._status(
+                        err_pkl or T["st_err_hd03_miss"], "", "", "",
+                    ),
+                ))
+                log.warning(f"{ma}: not found in HD03 ledger.")
+                continue
+
+            remaining = target
+            for _, hd in hd_sub.iterrows():
+                if remaining <= 0:
+                    break
+                avail = float(hd["bal"])
+                if avail <= 0:
+                    continue
+                take      = min(remaining, avail)
+                remaining = round(remaining - take, 4)
+
+                status = self._status(err_pkl, warn_zmm, T["st_ok"], T["st_warn_chk"])
+                results.append(self._row(
+                    hs, ma, str(hd["desc"]), unit,
+                    take, float(hd["price"]), str(hd["tk"]),
+                    status,
+                ))
+
+            # Residual after HD03 exhausted
+            if remaining > 1e-6:
+                results.append(self._row(
+                    hs, ma, "---", unit, remaining, 0.0, "---",
+                    self._status(
+                        err_pkl or T["st_err_hd03_empty"], warn_zmm, "", T["st_warn_chk"],
+                    ),
+                ))
+                log.warning(f"{ma}: HD03 depleted — residual {remaining}")
+
+        log.info(f"Pipeline complete: {len(results)} ECUS rows generated.")
+        return pd.DataFrame(results)
+
+
+# =============================================================================
+# 10. EXPORT MANAGER
+# =============================================================================
+
+class ExportManager:
 
     @staticmethod
-    def to_word(df: pd.DataFrame, txt: dict) -> bytes:
-        """Word confirmation report for discrepancy lines."""
+    def to_excel(df: pd.DataFrame) -> bytes:
+        buf = io.BytesIO()
+        with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, sheet_name="ECUS_FORM")
+            wb = writer.book
+            ws = writer.sheets["ECUS_FORM"]
+
+            # Formats
+            hdr = wb.add_format({
+                "bold": True, "bg_color": "#0F172A", "font_color": "#F8FAFC",
+                "border": 1, "align": "center", "valign": "vcenter", "text_wrap": True,
+            })
+            red  = wb.add_format({"bg_color": "#FEE2E2", "font_color": "#991B1B", "border": 1})
+            yel  = wb.add_format({"bg_color": "#FEF9C3", "font_color": "#854D0E", "border": 1})
+            grn  = wb.add_format({"bg_color": "#D1FAE5", "font_color": "#065F46", "border": 1})
+            norm = wb.add_format({"border": 1, "valign": "vcenter"})
+            num  = wb.add_format({"border": 1, "num_format": "#,##0.00", "valign": "vcenter"})
+            num4 = wb.add_format({"border": 1, "num_format": "#,##0.0000", "valign": "vcenter"})
+
+            num_cols = {T["c_luong"], T["c_tgia"]}
+            num4_cols = {T["c_dgia"]}
+            stat_idx  = len(df.columns) - 1
+
+            ws.set_row(0, 32)
+            for ci, cn in enumerate(df.columns):
+                ws.write(0, ci, cn, hdr)
+                w = min(max(df[cn].astype(str).map(len).max(), len(cn)) + 4, 50)
+                ws.set_column(ci, ci, w)
+
+            for ri, row_data in df.iterrows():
+                sv = str(row_data.iloc[stat_idx])
+                row_fmt = grn if "🟢" in sv else yel if "🟡" in sv else red
+                for ci, (cn, val) in enumerate(zip(df.columns, row_data)):
+                    safe = val if not (isinstance(val, float) and np.isnan(val)) else 0
+                    if ci == stat_idx:
+                        ws.write(ri + 1, ci, str(safe), row_fmt)
+                    elif cn in num_cols:
+                        ws.write_number(ri + 1, ci, float(safe) if safe else 0.0, num)
+                    elif cn in num4_cols:
+                        ws.write_number(ri + 1, ci, float(safe) if safe else 0.0, num4)
+                    else:
+                        ws.write(ri + 1, ci, "" if isinstance(safe, float) and np.isnan(safe) else safe, norm)
+
+            ws.freeze_panes(1, 0)
+            ws.autofilter(0, 0, len(df), len(df.columns) - 1)
+
+        return buf.getvalue()
+
+    @staticmethod
+    def to_word(df: pd.DataFrame) -> bytes:
         doc = Document()
-        heading = doc.add_heading(txt["btn_docx"].replace("📝 ", ""), 0)
-        heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph(f"Date/Time: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+        title = doc.add_heading(T["btn_docx"].replace("📝 ", ""), level=1)
+        title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-        status_col = txt["col_status"]
-        err_df = df[~df[status_col].str.contains("🟢", regex=False)]
+        meta = doc.add_paragraph(
+            f"System: EXIM Reconciliation Pro  |  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        for run in meta.runs:
+            run.font.color.rgb = RGBColor(0x64, 0x74, 0x8B)
+            run.font.size = Pt(10)
 
-        if err_df.empty:
-            doc.add_paragraph("✅ All rows valid — no discrepancies found.")
+        doc.add_paragraph("─" * 70)
+
+        sc = T["c_stat"]
+        df_err = df[~df[sc].astype(str).str.contains("🟢", regex=False)]
+
+        if df_err.empty:
+            doc.add_paragraph("✅ No discrepancies detected. All records are valid.")
         else:
-            tbl = doc.add_table(rows=1, cols=4)
+            n_r = df_err[sc].str.contains("🔴", regex=False).sum()
+            n_y = df_err[sc].str.contains("🟡", regex=False).sum()
+            doc.add_paragraph(
+                f"⚠️  {len(df_err)} issues found — 🔴 {n_r} errors  |  🟡 {n_y} warnings"
+            )
+            cols = [T["c_malieu"], T["c_luong"], T["c_tk"], T["c_stat"]]
+            cols = [c for c in cols if c in df.columns]
+
+            tbl = doc.add_table(rows=1, cols=len(cols))
             tbl.style = "Table Grid"
-            hdr = tbl.rows[0].cells
-            hdr[0].text = txt["col_material"]
-            hdr[1].text = txt["col_qty"]
-            hdr[2].text = txt["col_tk"]
-            hdr[3].text = txt["col_status"]
-            for _, row in err_df.head(200).iterrows():
+            for i, h in enumerate(cols):
+                cell = tbl.rows[0].cells[i]
+                cell.text = h
+                cell.paragraphs[0].runs[0].bold = True
+
+            for _, r in df_err.head(250).iterrows():
                 cells = tbl.add_row().cells
-                cells[0].text = str(row[txt["col_material"]])
-                cells[1].text = str(row[txt["col_qty"]])
-                cells[2].text = str(row[txt["col_tk"]])
-                cells[3].text = str(row[txt["col_status"]])
+                for i, c in enumerate(cols):
+                    cells[i].text = str(r.get(c, ""))
 
         buf = io.BytesIO()
         doc.save(buf)
         return buf.getvalue()
 
 
-# ==============================================================================
-# SECTION 7 — SIDEBAR CONFIG CONTROLS
-# ==============================================================================
-with st.sidebar:
-    st.markdown(t["config_side"])
-    tol_weight = st.slider(t["tol_w"], 0.0, 1.0, 0.20, 0.05)
-    tol_count  = st.slider(t["tol_c"], 0.0, 0.10, 0.01, 0.01)
+# =============================================================================
+# 11. SIDEBAR CONTROLS  (run after T is resolved)
+# =============================================================================
 
-    st.markdown(t["config_skip"])
-    skip_inv  = st.number_input(t["skip_inv"],  value=15, step=1)
-    skip_cd   = st.number_input(t["skip_cd"],   value=17, step=1)
-    skip_erp  = st.number_input(t["skip_erp"],  value=0,  step=1)
-    skip_ecus = st.number_input(t["skip_ecus"], value=7,  step=1)
+with st.sidebar:
+    st.markdown(f"**{T['cfg_tol']}**")
+    tol_w = st.slider(T["tol_w"], 0.0, 1.0,  0.20, 0.05)
+    tol_c = st.slider(T["tol_c"], 0.0, 0.10, 0.01, 0.01)
+    st.markdown("---")
+
+    with st.expander(T["cfg_col"], expanded=False):
+        ci = {
+            "inv_mat" : st.number_input(T["ci_inv_mat"],  value=1,  min_value=0, step=1),
+            "inv_qty" : st.number_input(T["ci_inv_qty"],  value=5,  min_value=0, step=1),
+            "mb_mat"  : st.number_input(T["ci_mb_mat"],   value=1,  min_value=0, step=1),
+            "mb_stk"  : st.number_input(T["ci_mb_stk"],   value=3,  min_value=0, step=1),
+            "iop_mat" : st.number_input(T["ci_iop_mat"],  value=1,  min_value=0, step=1),
+            "iop_rt"  : st.number_input(T["ci_iop_rt"],   value=7,  min_value=0, step=1),
+            "iop_ut"  : st.number_input(T["ci_iop_ut"],   value=6,  min_value=0, step=1),
+            "iop_hs"  : st.number_input(T["ci_iop_hs"],   value=8,  min_value=0, step=1),
+            "hd_mat"  : st.number_input(T["ci_hd_mat"],   value=2,  min_value=0, step=1),
+            "hd_tk"   : st.number_input(T["ci_hd_tk"],    value=0,  min_value=0, step=1),
+            "hd_bal"  : st.number_input(T["ci_hd_bal"],   value=4,  min_value=0, step=1),
+            "hd_pri"  : st.number_input(T["ci_hd_pri"],   value=5,  min_value=0, step=1),
+            "hd_dsc"  : st.number_input(T["ci_hd_dsc"],   value=3,  min_value=0, step=1),
+            "zmm_mat" : st.number_input(T["ci_zmm_mat"],  value=10, min_value=0, step=1),
+            "zmm_qty" : st.number_input(T["ci_zmm_qty"],  value=13, min_value=0, step=1),
+        }
 
     st.markdown("---")
-    if st.button("🚪 Logout", use_container_width=True):
-        st.session_state["auth"] = False
+    if st.button(T["logout"], use_container_width=True):
+        st.session_state.pop("auth", None)
+        log.info("User logged out.")
         st.rerun()
 
-# ==============================================================================
-# SECTION 8 — MAIN UI
-# ==============================================================================
-st.markdown(f"<h1>{t['main_title']}</h1>", unsafe_allow_html=True)
-st.markdown(
-    f"<p style='font-size:1.15em;color:#475569'>{t['main_sub']}</p>",
-    unsafe_allow_html=True,
-)
+
+# =============================================================================
+# 12. MAIN HEADER
+# =============================================================================
+
+st.markdown(f"<h1>{T['main_title']}</h1>", unsafe_allow_html=True)
+st.markdown(f"<p style='color:#475569;font-size:1.05em'>{T['main_sub']}</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# ── Data Lake ──────────────────────────────────────────────────────────────────
-st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
-st.markdown(t["dl_title"])
-st.caption(t["dl_sub"])
+tab_engine, tab_dash, tab_logs = st.tabs(
+    [T["tab_engine"], T["tab_dashboard"], T["tab_logs"]]
+)
 
-ALLOWED_TYPES = ["xlsx", "csv", "xls", "xlsb", "xlsm", "txt", "pdf", "jpg", "png", "jpeg"]
 
-c1, c2, c3 = st.columns(3)
-with c1: f_inv   = st.file_uploader(t["f_inv_lbl"],   type=ALLOWED_TYPES, key="up_inv")
-with c2: f_pkl   = st.file_uploader(t["f_pkl_lbl"],   type=ALLOWED_TYPES, key="up_pkl")
-with c3: f_hd03  = st.file_uploader(t["f_hd03_lbl"],  type=ALLOWED_TYPES, key="up_hd03")
+# =============================================================================
+# 13. TAB 1 — MAIN ENGINE
+# =============================================================================
 
-c4, c5, c6 = st.columns(3)
-with c4: f_zmm12 = st.file_uploader(t["f_zmm12_lbl"], type=ALLOWED_TYPES, key="up_zmm12")
-with c5: f_iop01 = st.file_uploader(t["f_iop01_lbl"], type=ALLOWED_TYPES, key="up_iop01")
-with c6: f_mb52  = st.file_uploader(t["f_mb52_lbl"],  type=ALLOWED_TYPES, key="up_mb52")
+with tab_engine:
 
-st.markdown("</div>", unsafe_allow_html=True)
-
-# ── Engine ─────────────────────────────────────────────────────────────────────
-ALL_FILES_LOADED = all([f_inv, f_pkl, f_hd03, f_zmm12, f_iop01, f_mb52])
-
-if ALL_FILES_LOADED:
+    # ── File upload lake ──────────────────────────────────────────────────────
     st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
-    st.markdown(t["eng_title"])
+    st.markdown(f"#### {T['dl_title']}")
+    st.caption(T["dl_sub"])
 
-    with st.spinner(t["spin_msg"]):
+    FMT = ["xlsx", "csv", "xls", "xlsb", "xlsm", "txt", "pdf", "png", "jpg", "jpeg"]
 
-        # ── Read raw files ────────────────────────────────────────────────
-        r_inv   = DataEngine.read_smart(f_inv,   ["Material code", "Material"])
-        r_hd03  = DataEngine.read_smart(f_hd03,  ["Mã nguyên liệu", "Material", "Mã NL"])
-        r_iop01 = DataEngine.read_smart(f_iop01, ["Material", "NLClass"])
-        r_mb52  = DataEngine.read_smart(f_mb52,  ["Material", "Unrestricted"])
-        r_zmm12 = DataEngine.read_smart(f_zmm12, ["PO Number", "Material"])
+    c1, c2, c3 = st.columns(3)
+    with c1: f_inv   = st.file_uploader(T["f_inv"],   type=FMT, key="up_inv")
+    with c2: f_pkl   = st.file_uploader(T["f_pkl"],   type=FMT, key="up_pkl")
+    with c3: f_hd03  = st.file_uploader(T["f_hd03"],  type=FMT, key="up_hd03")
 
-        GC = DataEngine.get_col    # alias
-        CN = DataEngine.clean_numeric
-
-        # ── MB52 — physical stock dict ────────────────────────────────────
-        df_mb = r_mb52[
-            [GC(r_mb52, ["Material", "Mã"], 1), GC(r_mb52, ["Unrestricted", "Tồn"], 3)]
-        ].copy()
-        df_mb.columns = ["Ma_R", "Ton_Kho_Thuc"]
-        df_mb["Ma_R"] = df_mb["Ma_R"].apply(DataEngine.purify_code)
-        df_mb["Ton_Kho_Thuc"] = CN(df_mb["Ton_Kho_Thuc"])
-        dict_mb52 = df_mb.groupby("Ma_R")["Ton_Kho_Thuc"].sum().to_dict()
-
-        # ── IOP01 — conversion rate dict ─────────────────────────────────
-        df_iop = r_iop01[
-            [
-                GC(r_iop01, ["Material"],        1),
-                GC(r_iop01, ["NLRate", "Tỷ lệ"], 7),
-                GC(r_iop01, ["NLUnit", "ĐVT"],   6),
-            ]
-        ].copy()
-        df_iop.columns = ["Ma_R", "NLRate", "NLUnit"]
-        df_iop["Ma_R"]   = df_iop["Ma_R"].apply(DataEngine.purify_code)
-        df_iop["NLRate"] = CN(df_iop["NLRate"])
-        df_iop = df_iop.drop_duplicates(subset=["Ma_R"])
-
-        # ── HD03 — customs ledger ─────────────────────────────────────────
-        df_hd03 = r_hd03[
-            [
-                GC(r_hd03, ["Mã nguyên liệu", "Mã NL"],        2),
-                GC(r_hd03, ["Số tờ khai", "TK"],                0),
-                GC(r_hd03, ["Ngày tờ khai", "Ngày"],            1),
-                GC(r_hd03, ["Lượng tồn", "Lượng còn lại", "Balance"], 4),
-                GC(r_hd03, ["Đơn giá", "Price"],                5),
-            ]
-        ].copy()
-        df_hd03.columns = ["Ma_R", "So_TK_Goc", "Ngay_TK", "Ton_HD03", "Don_Gia_HQ"]
-        df_hd03["Ma_R"]       = df_hd03["Ma_R"].apply(DataEngine.purify_code)
-        df_hd03["Ton_HD03"]   = CN(df_hd03["Ton_HD03"])
-        df_hd03["Don_Gia_HQ"] = CN(df_hd03["Don_Gia_HQ"])
-        # Drop rows with no material code or zero balance
-        df_hd03 = df_hd03[df_hd03["Ma_R"] != ""].copy()
-
-        # ── ZMM12 — accounting book dict ──────────────────────────────────
-        df_zmm12 = r_zmm12[
-            [GC(r_zmm12, ["Material"],        10), GC(r_zmm12, ["In Qty", "Qty"], 13)]
-        ].copy()
-        df_zmm12.columns = ["Ma_R", "Ton_ZMM12"]
-        df_zmm12["Ma_R"]     = df_zmm12["Ma_R"].apply(DataEngine.purify_code)
-        df_zmm12["Ton_ZMM12"] = CN(df_zmm12["Ton_ZMM12"])
-        dict_zmm12 = df_zmm12.groupby("Ma_R")["Ton_ZMM12"].sum().to_dict()
-
-        # ── Invoice — demand dict ─────────────────────────────────────────
-        df_inv = r_inv[
-            [GC(r_inv, ["Material code", "Material"], 1), GC(r_inv, ["Quantity", "PO Qty"], 5)]
-        ].copy()
-        df_inv.columns = ["Ma_R", "Qty_Invoice"]
-        df_inv["Ma_R"]       = df_inv["Ma_R"].apply(DataEngine.purify_code)
-        df_inv["Qty_Invoice"] = CN(df_inv["Qty_Invoice"])
-        inv_grouped = df_inv[df_inv["Ma_R"] != ""].groupby("Ma_R")["Qty_Invoice"].sum().reset_index()
-
-        # ── FIFO allocation loop ──────────────────────────────────────────
-        ecus_rows: list[dict] = []
-
-        # Column name map (localised)
-        C = t  # alias
-
-        for _, inv_row in inv_grouped.iterrows():
-            ma_r    = inv_row["Ma_R"]
-            qty_inv = inv_row["Qty_Invoice"]
-
-            if not ma_r or qty_inv <= 0:
-                continue
-
-            # Conversion rate & customs UOM
-            rate_info = df_iop[df_iop["Ma_R"] == ma_r]
-            rate = float(rate_info["NLRate"].iloc[0]) if not rate_info.empty else 1.0
-            unit = str(rate_info["NLUnit"].iloc[0])  if not rate_info.empty else "UNK"
-            target_hq = round(qty_inv * rate, 4)
-
-            # ── Pre-check 1: physical stock (MB52) ───────────────────────
-            ton_mb52 = dict_mb52.get(ma_r, 0)
-            if ton_mb52 < qty_inv:
-                ecus_rows.append(
-                    {
-                        C["col_material"]: ma_r,
-                        C["col_unit"]:     unit,
-                        C["col_qty"]:      target_hq,
-                        C["col_tk"]:       "---",
-                        C["col_price"]:    0,
-                        C["col_value"]:    0,
-                        C["col_status"]:   C["st_err_mb52"].format(ton_mb52),
-                    }
-                )
-                continue  # blocked — cannot allocate
-
-            # ── Pre-check 2: accounting book (ZMM12) ─────────────────────
-            ton_zmm   = dict_zmm12.get(ma_r, 0)
-            zmm_warn  = C["st_warn_zmm"] if ton_zmm < target_hq else ""
-
-            # ── HD03 FIFO split ───────────────────────────────────────────
-            hd03_sub = df_hd03[df_hd03["Ma_R"] == ma_r].copy()
-
-            if hd03_sub.empty:
-                ecus_rows.append(
-                    {
-                        C["col_material"]: ma_r,
-                        C["col_unit"]:     unit,
-                        C["col_qty"]:      target_hq,
-                        C["col_tk"]:       "---",
-                        C["col_price"]:    0,
-                        C["col_value"]:    0,
-                        C["col_status"]:   C["st_err_hd03_miss"],
-                    }
-                )
-                continue
-
-            remaining = target_hq
-            for _, hd in hd03_sub.iterrows():
-                if remaining <= 0:
-                    break
-                avail = hd["Ton_HD03"]
-                if avail <= 0:
-                    continue
-
-                take      = min(remaining, avail)
-                remaining = round(remaining - take, 4)
-
-                status = (
-                    zmm_warn + C["st_warn_chk"]
-                    if zmm_warn
-                    else C["st_ok"]
-                )
-                ecus_rows.append(
-                    {
-                        C["col_material"]: ma_r,
-                        C["col_unit"]:     unit,
-                        C["col_qty"]:      round(take, 2),
-                        C["col_tk"]:       hd["So_TK_Goc"],
-                        C["col_price"]:    hd["Don_Gia_HQ"],
-                        C["col_value"]:    round(take * hd["Don_Gia_HQ"], 2),
-                        C["col_status"]:   status,
-                    }
-                )
-
-            # Residual after exhausting HD03
-            if remaining > 0:
-                ecus_rows.append(
-                    {
-                        C["col_material"]: ma_r,
-                        C["col_unit"]:     unit,
-                        C["col_qty"]:      round(remaining, 2),
-                        C["col_tk"]:       "---",
-                        C["col_price"]:    0,
-                        C["col_value"]:    0,
-                        C["col_status"]:   C["st_err_hd03_empty"],
-                    }
-                )
-
-        df_final = pd.DataFrame(ecus_rows)
-
-    # ── Success banner ────────────────────────────────────────────────────────
-    st.success(t["succ_msg"])
-
-    # ── Summary metrics ───────────────────────────────────────────────────────
-    if not df_final.empty:
-        n_total = len(df_final)
-        n_ok    = df_final[t["col_status"]].str.contains("🟢", regex=False).sum()
-        n_warn  = df_final[t["col_status"]].str.contains("🟡", regex=False).sum()
-        n_err   = df_final[t["col_status"]].str.contains("🔴", regex=False).sum()
-        total_v = df_final[t["col_value"]].sum()
-
-        m1, m2, m3, m4, m5 = st.columns(5)
-        m1.metric(t["metric_total"], n_total)
-        m2.metric(t["metric_ok"],   n_ok)
-        m3.metric(t["metric_warn"], n_warn)
-        m4.metric(t["metric_err"],  n_err)
-        m5.metric(t["metric_value"], f"${total_v:,.2f}")
-
-    # ── Filter toggle ─────────────────────────────────────────────────────────
-    err_filter   = st.toggle(t["err_filter_lbl"], value=False)
-    board_display = (
-        df_final[~df_final[t["col_status"]].str.contains("🟢", regex=False)]
-        if err_filter
-        else df_final
-    )
-
-    # ── Styled table ──────────────────────────────────────────────────────────
-    def _style_status(val: str) -> str:
-        if "🔴" in str(val):
-            return "background-color:#fee2e2;color:#991b1b;font-weight:bold"
-        if "🟡" in str(val):
-            return "background-color:#fef08a;color:#854d0e;font-weight:bold"
-        if "🟢" in str(val):
-            return "background-color:#d1fae5;color:#065f46;font-weight:bold"
-        return ""
-
-    st.data_editor(
-        board_display.style.map(_style_status, subset=[t["col_status"]]),
-        use_container_width=True,
-        hide_index=True,
-        height=520,
-    )
-
-    # ── Download buttons ──────────────────────────────────────────────────────
-    dl1, dl2 = st.columns(2)
-
-    with dl1:
-        st.download_button(
-            label=t["btn_ecus_xlsx"],
-            data=ExportEngine.to_excel_ecus(df_final),
-            file_name=f"ECUS_Data_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-            type="primary",
-        )
-
-    with dl2:
-        st.download_button(
-            label=t["btn_docx"],
-            data=ExportEngine.to_word(df_final, t),
-            file_name=f"ECUS_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            use_container_width=True,
-        )
+    c4, c5, c6 = st.columns(3)
+    with c4: f_zmm12 = st.file_uploader(T["f_zmm12"], type=FMT, key="up_zmm12")
+    with c5: f_iop01 = st.file_uploader(T["f_iop01"], type=FMT, key="up_iop01")
+    with c6: f_mb52  = st.file_uploader(T["f_mb52"],  type=FMT, key="up_mb52")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-else:
-    st.info(t["miss_file_msg"])
+    # ── Engine execution ──────────────────────────────────────────────────────
+    if all([f_inv, f_pkl, f_hd03, f_zmm12, f_iop01, f_mb52]):
+
+        st.markdown("<div class='phase-box'>", unsafe_allow_html=True)
+        st.markdown(f"#### {T['eng_title']}")
+
+        with st.spinner(T["spin_msg"]):
+            raw = {
+                "inv"  : SmartReader.read(f_inv,   ["Material", "Material code"]),
+                "pkl"  : SmartReader.read(f_pkl,   ["Material", "Mã"]),
+                "hd03" : SmartReader.read(f_hd03,  ["Mã nguyên liệu", "Material", "Mã NL"]),
+                "iop01": SmartReader.read(f_iop01, ["Material", "NLClass"]),
+                "mb52" : SmartReader.read(f_mb52,  ["Material", "Unrestricted"]),
+                "zmm12": SmartReader.read(f_zmm12, ["PO Number", "Material"]),
+            }
+
+            broken = [k for k, v in raw.items() if v.empty]
+            if broken:
+                for k in broken:
+                    st.error(T["file_broken"].format(name=k.upper()))
+                    log.error(f"Abort: file {k} is empty after parsing.")
+            else:
+                engine = ReconciliationEngine(raw, ci)
+                df_out = engine.run()
+                st.session_state["ecus_output"] = df_out
+
+        if "ecus_output" in st.session_state and not st.session_state["ecus_output"].empty:
+            df_out = st.session_state["ecus_output"]
+            st.success(T["succ_msg"])
+
+            # ── Metric bar ────────────────────────────────────────────────────
+            sc = T["c_stat"]
+            n_ok   = int(df_out[sc].str.contains("🟢", regex=False).sum())
+            n_warn = int(df_out[sc].str.contains("🟡", regex=False).sum())
+            n_err  = int(df_out[sc].str.contains("🔴", regex=False).sum())
+            tot_v  = float(df_out[T["c_tgia"]].sum())
+
+            m1, m2, m3, m4, m5 = st.columns(5)
+            m1.metric(T["m_total"], len(df_out))
+            m2.metric(T["m_ok"],   n_ok)
+            m3.metric(T["m_warn"], n_warn,
+                      delta=f"-{n_warn}" if n_warn else None, delta_color="inverse")
+            m4.metric(T["m_err"],  n_err,
+                      delta=f"-{n_err}"  if n_err  else None, delta_color="inverse")
+            m5.metric(T["m_value"], f"${tot_v:,.2f}")
+
+            st.divider()
+
+            # ── Filter + table ────────────────────────────────────────────────
+            err_only = st.toggle(T["err_toggle"], value=False)
+            disp = (
+                df_out[~df_out[sc].str.contains("🟢", regex=False)]
+                if err_only
+                else df_out
+            )
+
+            def _style(v: str) -> str:
+                s = str(v)
+                if "🔴" in s: return "background:#fee2e2;color:#991b1b;font-weight:700"
+                if "🟡" in s: return "background:#fef9c3;color:#854d0e;font-weight:700"
+                if "🟢" in s: return "background:#d1fae5;color:#065f46;font-weight:700"
+                return ""
+
+            st.data_editor(
+                disp.style
+                    .map(_style, subset=[sc])
+                    .format({
+                        T["c_luong"]: "{:,.2f}",
+                        T["c_dgia"] : "{:,.4f}",
+                        T["c_tgia"] : "{:,.2f}",
+                    }),
+                use_container_width=True,
+                hide_index=True,
+                height=520,
+            )
+
+            # ── Downloads ─────────────────────────────────────────────────────
+            st.write("")
+            d1, d2 = st.columns(2)
+            ts = datetime.now().strftime("%Y%m%d_%H%M")
+
+            with d1:
+                st.download_button(
+                    T["btn_xlsx"],
+                    data=ExportManager.to_excel(df_out),
+                    file_name=f"ECUS_{ts}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    type="primary",
+                )
+            with d2:
+                st.download_button(
+                    T["btn_docx"],
+                    data=ExportManager.to_word(df_out),
+                    file_name=f"Report_{ts}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    use_container_width=True,
+                )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    else:
+        st.info(T["miss_files"])
+
+
+# =============================================================================
+# 14. TAB 2 — DASHBOARD
+# =============================================================================
+
+with tab_dash:
+    st.markdown(f"### 📊 {T['dash_title']}")
+
+    df_dash: pd.DataFrame = st.session_state.get("ecus_output", pd.DataFrame())
+
+    if df_dash.empty:
+        st.warning(T["dash_empty"])
+    else:
+        sc = T["c_stat"]
+        counts = {
+            "🟢 " + T["m_ok"]  : int(df_dash[sc].str.contains("🟢", regex=False).sum()),
+            "🟡 " + T["m_warn"]: int(df_dash[sc].str.contains("🟡", regex=False).sum()),
+            "🔴 " + T["m_err"] : int(df_dash[sc].str.contains("🔴", regex=False).sum()),
+        }
+
+        left, right = st.columns(2)
+
+        with left:
+            st.markdown(f"#### {T['dash_health']}")
+            chart_df = pd.DataFrame(
+                {"Count": list(counts.values())}, index=list(counts.keys())
+            )
+            st.bar_chart(chart_df, color=["#3B82F6"], use_container_width=True)
+
+        with right:
+            st.markdown(f"#### {T['dash_top5']}")
+            top5 = (
+                df_dash[[T["c_malieu"], T["c_tgia"]]]
+                .groupby(T["c_malieu"], as_index=False)[T["c_tgia"]]
+                .sum()
+                .nlargest(5, T["c_tgia"])
+                .set_index(T["c_malieu"])
+            )
+            st.bar_chart(top5, color=["#10B981"], use_container_width=True)
+
+        st.divider()
+        # Summary table
+        st.markdown(f"**{T['m_total']}:** {len(df_dash)}  |  "
+                    f"**{T['m_value']}:** ${df_dash[T['c_tgia']].sum():,.2f}")
+
+
+# =============================================================================
+# 15. TAB 3 — SYSTEM LOGS
+# =============================================================================
+
+with tab_logs:
+    st.markdown(f"### {T['log_title']}")
+
+    col_hdr, col_btn = st.columns([4, 1])
+    with col_btn:
+        if st.button(T["log_clear"], use_container_width=True):
+            log.clear()
+            st.rerun()
+
+    all_logs = log.all()
+    if not all_logs:
+        st.info(T["log_empty"])
+    else:
+        ICON = {LogLevel.INFO: "ℹ️", LogLevel.WARNING: "⚠️", LogLevel.ERROR: "🚨"}
+        for entry in reversed(all_logs):
+            ts  = entry.timestamp.strftime("%H:%M:%S")
+            ico = ICON.get(entry.level, "•")
+            with st.expander(
+                f"{ico} [{ts}]  {entry.level.value}  —  {entry.message}",
+                expanded=(entry.level == LogLevel.ERROR),
+            ):
+                st.code(
+                    entry.details if entry.details else T["log_no_detail"],
+                    language="text",
+                )
